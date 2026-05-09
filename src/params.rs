@@ -1,6 +1,5 @@
 use crate::model::{
-    NodeRuntimeParams, NodeType, PresetState, RootNote, RuntimeSnapshot, ScaleMode,
-    MAX_NODE_SLOTS,
+    NodeRuntimeParams, NodeType, PresetState, RootNote, RuntimeSnapshot, ScaleMode, MAX_NODE_SLOTS,
 };
 use nih_plug::prelude::*;
 use nih_plug_egui::EguiState;
@@ -25,6 +24,9 @@ pub struct PluginParams {
 
     #[id = "msos"]
     pub max_sections: IntParam,
+
+    #[id = "xfms"]
+    pub transition_ms: FloatParam,
 
     #[nested(array, group = "Nodes")]
     pub nodes: [NodeParams; MAX_NODE_SLOTS],
@@ -92,8 +94,23 @@ impl Default for PluginParams {
             max_sections: IntParam::new(
                 "Max SOS",
                 1024,
-                IntRange::Linear { min: 8, max: 4096 },
+                IntRange::Linear {
+                    min: 8,
+                    max: crate::dsp::MAX_RUNTIME_SECTIONS as i32,
+                },
             ),
+            transition_ms: FloatParam::new(
+                "Transition",
+                50.0,
+                FloatRange::Skewed {
+                    min: 0.0,
+                    max: 500.0,
+                    factor: FloatRange::skew_factor(-1.0),
+                },
+            )
+            .with_unit(" ms")
+            .with_step_size(1.0)
+            .with_value_to_string(formatters::v2s_f32_rounded(0)),
             nodes: std::array::from_fn(NodeParams::new),
         }
     }
@@ -105,8 +122,30 @@ impl PluginParams {
             global_delay_ms: self.global_delay_ms.value().clamp(0.0, 1000.0),
             wet: self.wet.value().clamp(0.0, 1.0),
             output_gain_db: util::gain_to_db(self.output_gain_db.value()),
-            max_sections: self.max_sections.value().clamp(8, 4096) as u32,
+            max_sections: self
+                .max_sections
+                .value()
+                .clamp(8, crate::dsp::MAX_RUNTIME_SECTIONS as i32) as u32,
             nodes: std::array::from_fn(|index| self.nodes[index].runtime_params()),
+        }
+    }
+
+    /// スムース前の目標値で snapshot を作る。rebuild 判定と greedy 計算に使う。
+    /// smoother のアニメーション中でも値が変化しないため毎フレーム rebuild が
+    /// 走るのを防ぐ。
+    pub fn target_snapshot(&self) -> RuntimeSnapshot {
+        RuntimeSnapshot {
+            global_delay_ms: self
+                .global_delay_ms
+                .unmodulated_plain_value()
+                .clamp(0.0, 1000.0),
+            wet: self.wet.unmodulated_plain_value().clamp(0.0, 1.0),
+            output_gain_db: util::gain_to_db(self.output_gain_db.unmodulated_plain_value()),
+            max_sections: self
+                .max_sections
+                .unmodulated_plain_value()
+                .clamp(8, crate::dsp::MAX_RUNTIME_SECTIONS as i32) as u32,
+            nodes: std::array::from_fn(|index| self.nodes[index].target_params()),
         }
     }
 }
@@ -169,6 +208,18 @@ impl NodeParams {
             freq_hz: self.freq_hz.value().clamp(20.0, 20000.0),
             amount_ms: self.amount_ms.value().clamp(0.0, 1000.0),
             width_oct: self.width_oct.value().clamp(0.01, 6.0),
+            scale_root: self.scale_root.value(),
+            scale_mode: self.scale_mode.value(),
+        }
+    }
+
+    pub fn target_params(&self) -> NodeRuntimeParams {
+        NodeRuntimeParams {
+            enabled: self.enabled.value(),
+            node_type: self.node_type.value(),
+            freq_hz: self.freq_hz.unmodulated_plain_value().clamp(20.0, 20000.0),
+            amount_ms: self.amount_ms.unmodulated_plain_value().clamp(0.0, 1000.0),
+            width_oct: self.width_oct.unmodulated_plain_value().clamp(0.01, 6.0),
             scale_root: self.scale_root.value(),
             scale_mode: self.scale_mode.value(),
         }

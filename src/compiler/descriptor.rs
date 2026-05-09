@@ -11,6 +11,7 @@ pub enum SectionDescriptor {
 #[derive(Clone, Debug)]
 pub struct RuntimeChainDescriptor {
     pub global_delay_ms: f32,
+    pub max_sections: usize,
     pub sections: ArrayVec<SectionDescriptor, { crate::dsp::MAX_RUNTIME_SECTIONS }>,
 }
 
@@ -18,6 +19,7 @@ impl Default for RuntimeChainDescriptor {
     fn default() -> Self {
         Self {
             global_delay_ms: 0.0,
+            max_sections: 0,
             sections: ArrayVec::new(),
         }
     }

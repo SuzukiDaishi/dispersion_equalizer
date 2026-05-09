@@ -30,6 +30,7 @@ pub fn compile_runtime_descriptor(
 
     RuntimeChainDescriptor {
         global_delay_ms: result.base_delay_ms,
+        max_sections: (snapshot.max_sections as usize).min(crate::dsp::MAX_RUNTIME_SECTIONS),
         sections,
     }
 }

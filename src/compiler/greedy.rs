@@ -6,6 +6,7 @@
 use std::f32::consts::PI;
 
 use crate::compiler::descriptor::SectionDescriptor;
+use crate::dsp::allpass::pole_radius_from_freq_q;
 use crate::model::{NodeRuntimeParams, NodeType, RootNote, RuntimeSnapshot, ScaleMode};
 
 const GRID_N: usize = 128;
@@ -44,8 +45,7 @@ pub fn run_greedy(snapshot: &RuntimeSnapshot, sample_rate: f32) -> GreedyResult 
     });
 
     // Target group delay at each grid point
-    let target: [f32; GRID_N] =
-        std::array::from_fn(|k| target_at_freq(snapshot, freqs[k]));
+    let target: [f32; GRID_N] = std::array::from_fn(|k| target_at_freq(snapshot, freqs[k]));
 
     // Pure delay = minimum of target (extracted as global delay)
     let base_delay_ms = target
@@ -55,8 +55,7 @@ pub fn run_greedy(snapshot: &RuntimeSnapshot, sample_rate: f32) -> GreedyResult 
         .clamp(0.0, 1000.0);
 
     // Residual after subtracting pure delay
-    let residual: [f32; GRID_N] =
-        std::array::from_fn(|k| (target[k] - base_delay_ms).max(0.0));
+    let residual: [f32; GRID_N] = std::array::from_fn(|k| (target[k] - base_delay_ms).max(0.0));
 
     // Build candidate (freq, Q) pairs
     let centers = build_candidate_centers(snapshot, sample_rate, top_freq);
@@ -136,22 +135,20 @@ fn build_candidate_centers(
     top_freq: f32,
 ) -> Vec<CandidateCenter> {
     // Key = freq rounded to 2 decimal places for dedup
-    let mut map: std::collections::HashMap<u64, CandidateCenter> =
-        std::collections::HashMap::new();
+    let mut map: std::collections::HashMap<u64, CandidateCenter> = std::collections::HashMap::new();
 
-    let add = |map: &mut std::collections::HashMap<u64, CandidateCenter>,
-               f: f32,
-               pq: Option<f32>| {
-        let cf = f.clamp(MIN_FREQ, top_freq);
-        let key = (cf * 100.0).round() as u64;
-        let entry = map.entry(key).or_insert(CandidateCenter {
-            freq: cf,
-            preferred_q: None,
-        });
-        if pq.is_some() {
-            entry.preferred_q = pq;
-        }
-    };
+    let add =
+        |map: &mut std::collections::HashMap<u64, CandidateCenter>, f: f32, pq: Option<f32>| {
+            let cf = f.clamp(MIN_FREQ, top_freq);
+            let key = (cf * 100.0).round() as u64;
+            let entry = map.entry(key).or_insert(CandidateCenter {
+                freq: cf,
+                preferred_q: None,
+            });
+            if pq.is_some() {
+                entry.preferred_q = pq;
+            }
+        };
 
     // 36-point log grid
     for i in 0..36 {
@@ -181,16 +178,8 @@ fn build_candidate_centers(
                 let q = oct_bandwidth_to_q(node.width_oct);
                 add(&mut map, node.freq_hz, Some(q));
                 let half = node.width_oct * 0.5;
-                add(
-                    &mut map,
-                    node.freq_hz / 2.0_f32.powf(half),
-                    Some(q * 0.75),
-                );
-                add(
-                    &mut map,
-                    node.freq_hz * 2.0_f32.powf(half),
-                    Some(q * 0.75),
-                );
+                add(&mut map, node.freq_hz / 2.0_f32.powf(half), Some(q * 0.75));
+                add(&mut map, node.freq_hz * 2.0_f32.powf(half), Some(q * 0.75));
             }
         }
     }
@@ -329,33 +318,33 @@ fn root_note_semitone(root: RootNote) -> i32 {
 
 // ─── DSP math (matches preview.html exactly) ─────────────────────────────────
 
-/// Group delay (ms) of one RBJ biquad all-pass at frequency `freq`.
+/// Group delay (ms) of one pole/radius biquad all-pass at frequency `freq`.
 /// Uses finite-difference phase derivative — same as preview.html `groupDelayMsOne()`.
 pub fn group_delay_ms_one(freq: f32, center: f32, q: f32, sample_rate: f32) -> f32 {
     let df = (freq * 0.0015).clamp(0.25, 40.0);
     let f_a = (freq - df).clamp(1.0, sample_rate * 0.49);
     let f_b = (freq + df).clamp(1.0, sample_rate * 0.49);
-    let p_a = rbj_allpass_phase(f_a, center, q, sample_rate);
-    let p_b = rbj_allpass_phase(f_b, center, q, sample_rate);
+    let p_a = pole_allpass_phase(f_a, center, q, sample_rate);
+    let p_b = pole_allpass_phase(f_b, center, q, sample_rate);
     let d_phi = unwrap_delta(p_b - p_a);
     let d_omega = 2.0 * PI * (f_b - f_a) / sample_rate;
     (-d_phi / d_omega).max(0.0) / sample_rate * 1000.0
 }
 
-/// Phase of H(e^jω) for RBJ biquad all-pass at evaluation frequency `freq_hz`.
-fn rbj_allpass_phase(freq_hz: f32, center_hz: f32, q: f32, sample_rate: f32) -> f32 {
-    // Coefficients at centre frequency
-    let w0 = 2.0 * PI * center_hz.clamp(1.0, sample_rate * 0.49) / sample_rate;
-    let alpha = w0.sin() / (2.0 * q.clamp(0.0001, 1000.0));
-    let cos_w0 = w0.cos();
-    let a0_inv = 1.0 / (1.0 + alpha);
-    let b0 = (1.0 - alpha) * a0_inv;
-    let b1 = (-2.0 * cos_w0) * a0_inv;
-    let b2 = (1.0 + alpha) * a0_inv;
-    let a1 = b1;
-    let a2 = b0;
+/// Phase of H(e^jω) for pole/radius biquad all-pass at evaluation frequency `freq_hz`.
+fn pole_allpass_phase(freq_hz: f32, center_hz: f32, q: f32, sample_rate: f32) -> f32 {
+    let sample_rate = sample_rate.max(1.0);
+    let center = center_hz.clamp(1.0, sample_rate * 0.49);
+    let theta = 2.0 * PI * center / sample_rate;
+    let radius = pole_radius_from_freq_q(sample_rate, center, q);
+    let radius_sq = radius * radius;
+    let pole_term = -2.0 * radius * theta.cos();
+    let b0 = radius_sq;
+    let b1 = pole_term;
+    let b2 = 1.0;
+    let a1 = pole_term;
+    let a2 = radius_sq;
 
-    // Evaluate H(e^jω) at eval frequency
     let w = 2.0 * PI * freq_hz.clamp(1.0, sample_rate * 0.49) / sample_rate;
     let c1 = (-w).cos();
     let s1 = (-w).sin();
@@ -439,16 +428,28 @@ mod tests {
         };
         let result = run_greedy(&snap, 48_000.0);
         // Actual delay at 1 kHz > at 8 kHz
-        let at_center: f32 = result.sections.iter().map(|s| match *s {
-            SectionDescriptor::SecondOrder { freq_hz, q } =>
-                group_delay_ms_one(1000.0, freq_hz, q, 48_000.0),
-            _ => 0.0,
-        }).sum::<f32>() + result.base_delay_ms;
-        let at_far: f32 = result.sections.iter().map(|s| match *s {
-            SectionDescriptor::SecondOrder { freq_hz, q } =>
-                group_delay_ms_one(8000.0, freq_hz, q, 48_000.0),
-            _ => 0.0,
-        }).sum::<f32>() + result.base_delay_ms;
+        let at_center: f32 = result
+            .sections
+            .iter()
+            .map(|s| match *s {
+                SectionDescriptor::SecondOrder { freq_hz, q } => {
+                    group_delay_ms_one(1000.0, freq_hz, q, 48_000.0)
+                }
+                _ => 0.0,
+            })
+            .sum::<f32>()
+            + result.base_delay_ms;
+        let at_far: f32 = result
+            .sections
+            .iter()
+            .map(|s| match *s {
+                SectionDescriptor::SecondOrder { freq_hz, q } => {
+                    group_delay_ms_one(8000.0, freq_hz, q, 48_000.0)
+                }
+                _ => 0.0,
+            })
+            .sum::<f32>()
+            + result.base_delay_ms;
         assert!(at_center > at_far, "center={at_center:.2} far={at_far:.2}");
     }
 
@@ -481,7 +482,8 @@ mod tests {
         // A4 = 440 Hz must be present
         assert!(
             freqs.iter().any(|&f| (f - 440.0).abs() < 0.5),
-            "440 Hz not found in {:?}", &freqs[..freqs.len().min(10)]
+            "440 Hz not found in {:?}",
+            &freqs[..freqs.len().min(10)]
         );
     }
 }

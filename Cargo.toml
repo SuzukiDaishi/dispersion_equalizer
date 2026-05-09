@@ -2,7 +2,7 @@
 name = "dispersion_equalizer"
 version = "0.1.0"
 edition = "2021"
-authors = ["Daishi Suzuki <zukky.rikugame@gmail.com>"]
+authors = ["zukky <zukky.rikugame@gmail.com>"]
 license = "ISC"
 homepage = "https://github.com/suzukidaishi"
 description = "Dispersion Equalizer is a group-delay EQ that shapes the timing of sound across frequency while preserving the original tonal balance."
@@ -26,6 +26,7 @@ nih_plug_egui = { git = "https://github.com/robbert-vdh/nih-plug.git" }
 # the GPL compatibility requirement
 # nih_plug = { git = "https://github.com/robbert-vdh/nih-plug.git", default-features = false, features = ["assert_process_allocs"] }
 arrayvec = "0.7"
+arc-swap = "1.7"
 atomic_float = "0.1"
 egui = "0.31"
 serde = { version = "1.0", features = ["derive"] }

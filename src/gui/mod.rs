@@ -65,9 +65,13 @@ pub fn draw_editor(
             ui.add(
                 widgets::ParamSlider::for_param(&params.output_gain_db, setter).with_width(100.0),
             );
+        });
+        ui.horizontal(|ui| {
             ui.label("Max SOS");
+            ui.add(widgets::ParamSlider::for_param(&params.max_sections, setter).with_width(110.0));
+            ui.label("Transition");
             ui.add(
-                widgets::ParamSlider::for_param(&params.max_sections, setter).with_width(110.0),
+                widgets::ParamSlider::for_param(&params.transition_ms, setter).with_width(100.0),
             );
         });
     });
