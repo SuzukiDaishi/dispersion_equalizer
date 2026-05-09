@@ -9,7 +9,7 @@ Current MVP features:
 - CLAP/VST3 build targets through NIH-plug
 - Global Delay
 - Bell Delay nodes
-- Disperser nodes
+- Bell/Shelf/Scale delay nodes
 - Fixed 16 node slots for DAW automation
 - Dark egui graph editor with target/actual delay curves
 - Node add/select/drag/duplicate/remove

@@ -48,10 +48,10 @@
 ### 主要目標
 
 ```text
-- Disperser 的な分散エフェクトを含められる
+- Phase Spread 的な分散エフェクトを含められる
 - Pro-Q3 的な直感的ノードUI
 - 横軸周波数、縦軸delay ms のグラフ
-- Bell / Shelf / Disperser / Scale / Global Delay ノード
+- Bell / Shelf / Phase Spread / Scale / Global Delay ノード
 - 再生中にノードを動かしても音が途切れない
 - wet 100% 時はできる限り振幅フラット
 - DAW automation 対応
@@ -221,7 +221,7 @@ GUI上の編集単位。
 ```text
 Bell Delay Node
 Shelf Delay Node
-Disperser Node
+Phase Spread Node
 Scale Delay Node
 Global Delay
 Free Draw Node
@@ -300,9 +300,9 @@ UI上の形:
 
 ---
 
-### 5.1.3 Disperser Node
+### 5.1.3 Phase Spread Node
 
-Disperser 的な専用ノード。
+Phase Spread 的な専用ノード。
 
 ```text
 parameter:
@@ -342,7 +342,7 @@ pinch high:
 
 に反映する。
 
-Disperser Node は target fitting ではなく、**直接 all-pass stack を生成**する。
+Phase Spread Node は target fitting ではなく、**直接 all-pass stack を生成**する。
 
 ---
 
@@ -594,7 +594,7 @@ Global Delay:
 Bell Delay:
   direct 2nd-order all-pass primitive
 
-Disperser:
+Phase Spread:
   dedicated all-pass stack
 
 Shelf:
@@ -656,7 +656,7 @@ pole parameter smoothing
 構造が少し変わる変更。
 
 ```text
-- Disperser amount が大きく変化
+- Phase Spread amount が大きく変化
 - section数が変わる
 - quality変更
 ```
@@ -874,7 +874,7 @@ old delay time と new delay time を同時に読み出して crossfade。
 Bell Node:
   max 4 SOS
 
-Disperser Node:
+Phase Spread Node:
   max 32 SOS
 
 Low/High Shelf Node:
@@ -1068,7 +1068,7 @@ Bell:
   Amount
   Width
 
-Disperser:
+Phase Spread:
   Freq
   Amount
   Pinch
@@ -1221,7 +1221,7 @@ struct NodeModel {
 #[derive(Clone, Copy, Serialize, Deserialize)]
 enum NodeType {
     Bell,
-    Disperser,
+    Phase Spread,
     LowShelf,
     HighShelf,
     Scale,
@@ -1305,7 +1305,7 @@ ActualGroupDelayPreview
 
 ---
 
-# 15. Disperser Node 詳細
+# 15. Phase Spread Node 詳細
 
 ## 15.1 パラメータ
 
@@ -1329,7 +1329,7 @@ order:
 ## 15.2 Section生成
 
 ```rust
-fn compile_disperser(node: &NodeModel, sr: f32, quality: QualityMode) -> Vec<SectionDescriptor> {
+fn compile_phase_spread(node: &NodeModel, sr: f32, quality: QualityMode) -> Vec<SectionDescriptor> {
     let n = compute_section_count(node.amount_ms, node.order, quality);
     let spread = node.spread_oct;
     let pinch = node.pinch;
@@ -1416,17 +1416,17 @@ quality mode
 ```text
 Eco:
   Bell max 1-2 sections
-  Disperser max 8 sections
+  Phase Spread max 8 sections
   Scale max 32 sections
 
 Normal:
   Bell max 4 sections
-  Disperser max 24 sections
+  Phase Spread max 24 sections
   Scale max 96 sections
 
 High:
   Bell max 8 sections
-  Disperser max 48 sections
+  Phase Spread max 48 sections
   Scale max 160 sections
 
 Insane:
@@ -1453,7 +1453,7 @@ Insane:
 
 ```text
 - Bell Node の peak が指定周波数近くに出る
-- Disperser Node の pinch が効く
+- Phase Spread Node の pinch が効く
 - Scale Node が指定scale frequencyにpeakを作る
 - Global Delay が全帯域一定delayになる
 ```
@@ -1539,7 +1539,7 @@ FL Studio:
 ```text
 Global Delay
 単一Bell Delay
-単一Disperserもどき
+単一Phase Spreadもどき
 ```
 
 ---
@@ -1550,7 +1550,7 @@ Global Delay
 - NodeModel
 - NodeType
 - Bell compiler
-- Disperser compiler
+- Phase Spread compiler
 - Shelf compiler
 - Scale compiler
 - ChainDescriptor
@@ -1681,7 +1681,7 @@ src/
   compiler/
     mod.rs
     bell.rs
-    disperser.rs
+    phase_spread.rs
     shelf.rs
     scale.rs
     free_draw.rs
@@ -1709,7 +1709,7 @@ Format:
 DSP:
   Global Delay
   Bell Delay
-  Disperser Node
+  Phase Spread Node
 
 GUI:
   Pro-Q風 graph
@@ -1748,7 +1748,7 @@ VST3配布
 
 2. Global Delay は pure delay で処理
 
-3. Disperser は専用 all-pass stack
+3. Phase Spread は専用 all-pass stack
 
 4. Bell/Shelf/Scale はノード別 primitive
 
@@ -1766,6 +1766,6 @@ VST3配布
 ```
 
 この設計なら、
-**Disperser的な音作り** と **汎用的なGroup Delay EQ** の両方を狙えます。
+**Phase Spread的な音作り** と **汎用的なGroup Delay EQ** の両方を狙えます。
 
 [1]: https://github.com/robbert-vdh/nih-plug "GitHub - robbert-vdh/nih-plug: Rust VST3 and CLAP plugin framework and plugins - because everything is better when you do it yourself · GitHub"

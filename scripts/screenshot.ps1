@@ -127,7 +127,7 @@ public class ClientHelper {
     [DllImport("user32.dll")] public static extern bool ClientToScreen(IntPtr h, ref PT p);
 }
 "@
-    # Demo build pre-loads node 0 as Disperser — no click needed.
+    # Demo build pre-loads node 0 for the phase-spread preset, so no click is needed.
     # Extra sleep so egui finishes first render.
     Start-Sleep -Seconds 1
 } else {

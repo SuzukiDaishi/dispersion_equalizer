@@ -75,7 +75,6 @@ def test_vst3_loads_and_exposes_parameters():
     assert "Low Shelf" in valid_types
     assert "High Shelf" in valid_types
     assert "Scale / Pentatonic" in valid_types
-    assert "Disperser" not in valid_types
 
 
 def test_default_patch_is_finite_passthrough():

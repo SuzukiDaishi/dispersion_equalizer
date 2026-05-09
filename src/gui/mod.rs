@@ -31,8 +31,8 @@ pub fn draw_editor(
             if ui.button("Big Global").clicked() {
                 apply_preset(setter, params, BuiltinPreset::BigGlobal);
             }
-            if ui.button("Disperser").clicked() {
-                apply_preset(setter, params, BuiltinPreset::Disperser);
+            if ui.button("Spread").clicked() {
+                apply_preset(setter, params, BuiltinPreset::PhaseSpread);
             }
             if ui.button("Vocal Air").clicked() {
                 apply_preset(setter, params, BuiltinPreset::VocalAir);
@@ -88,7 +88,7 @@ pub fn draw_editor(
 enum BuiltinPreset {
     Flat,
     BigGlobal,
-    Disperser,
+    PhaseSpread,
     VocalAir,
     AMinorPenta,
     BassPush,
@@ -107,8 +107,8 @@ fn apply_preset(setter: &ParamSetter, params: &PluginParams, preset: BuiltinPres
         BuiltinPreset::BigGlobal => {
             set_param(setter, &params.global_delay_ms, 650.0);
         }
-        // Two Bell nodes (900 Hz 260 ms + 2400 Hz 180 ms) — matches preview.html "Disperser" preset
-        BuiltinPreset::Disperser => {
+        // Two Bell nodes for a broad phase-spread preset.
+        BuiltinPreset::PhaseSpread => {
             configure_node(setter, params, 0, NodeType::Bell, 900.0, 260.0, 1.0);
             configure_node(setter, params, 1, NodeType::Bell, 2400.0, 180.0, 0.9);
         }

@@ -653,7 +653,7 @@
       <div class="button-grid three-cols">
         <button data-preset="flat">Flat</button>
         <button data-preset="global">Big Global</button>
-        <button data-preset="disperser">Disperser</button>
+        <button data-preset="phaseSpread">Spread</button>
         <button data-preset="vocal">Vocal Air</button>
         <button data-preset="pentatonic">A minor Penta</button>
         <button data-preset="bass">Bass Push</button>
@@ -2001,8 +2001,8 @@
       // keep empty
     } else if (name === "global") {
       state.globalDelayMs = 650;
-    } else if (name === "disperser") {
-      addNode("bell", { name: "Disperser Mid", freqHz: 900, amountMs: 520, widthOct: 1.2 });
+    } else if (name === "phaseSpread") {
+      addNode("bell", { name: "Phase Spread Mid", freqHz: 900, amountMs: 520, widthOct: 1.2 });
       addNode("bell", { name: "Snap Peak", freqHz: 2400, amountMs: 180, widthOct: 0.55 });
       state.selectedNodeId = state.nodes[0].id;
     } else if (name === "vocal") {
