@@ -1,5 +1,7 @@
 # Dispersion Equalizer
 
+![Dispersion Equalizer UI](docs/view.png)
+
 Dispersion Equalizer is a group-delay EQ built with Rust and NIH-plug. Instead of changing gain per frequency band, it changes arrival time per frequency band with pure delay and all-pass filters while keeping the wet path as amplitude-flat as practical.
 
 Current MVP features:
