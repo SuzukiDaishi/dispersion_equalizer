@@ -1,0 +1,45 @@
+[package]
+name = "dispersion_equalizer"
+version = "0.1.0"
+edition = "2021"
+authors = ["Daishi Suzuki <zukky.rikugame@gmail.com>"]
+license = "ISC"
+homepage = "https://github.com/suzukidaishi"
+description = "Dispersion Equalizer is a group-delay EQ that shapes the timing of sound across frequency while preserving the original tonal balance."
+
+[workspace]
+members = ["xtask"]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "dispersion_equalizer_standalone"
+path = "src/main.rs"
+
+[dependencies]
+# Remove the `assert_process_allocs` feature to allow allocations on the audio
+# thread in debug builds.
+nih_plug = { git = "https://github.com/robbert-vdh/nih-plug.git", features = ["assert_process_allocs", "standalone"] }
+nih_plug_egui = { git = "https://github.com/robbert-vdh/nih-plug.git" }
+# Uncomment the below line to disable the on-by-default VST3 feature to remove
+# the GPL compatibility requirement
+# nih_plug = { git = "https://github.com/robbert-vdh/nih-plug.git", default-features = false, features = ["assert_process_allocs"] }
+arrayvec = "0.7"
+atomic_float = "0.1"
+egui = "0.31"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+smallvec = "1.13"
+
+[features]
+demo = []
+
+[profile.release]
+lto = "thin"
+strip = "symbols"
+
+[profile.profiling]
+inherits = "release"
+debug = true
+strip = "none"

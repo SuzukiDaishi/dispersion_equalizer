@@ -1,0 +1,24 @@
+# Rust ビルド成果物
+/target
+
+# Python
+.venv/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+*.py[cod]
+
+# AI アシスタントのセッション状態 (ローカル専用)
+.claude/
+
+# テスト生成物
+/test_artifacts/
+
+# リリース ZIP
+*.zip
+
+# エディタ・IDE
+.vscode/
+.idea/
+*.suo
+*.user

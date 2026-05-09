@@ -1,0 +1,11 @@
+[project]
+name = "dispersion-equalizer"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "numpy>=2.4.4",
+    "pedalboard>=0.9.22",
+    "pytest>=9.0.3",
+]

@@ -1,0 +1,2112 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Graphic Group Delay EQ v6 - Pro UI Prototype</title>
+<style>
+  :root {
+    --bg: #10131a;
+    --panel: #191d27;
+    --panel2: #242a37;
+    --text: #f1f5ff;
+    --muted: #aeb8cf;
+    --line: #3b4358;
+    --accent: #7dd3fc;
+    --accent2: #f0abfc;
+    --warn: #fbbf24;
+    --ok: #86efac;
+    --danger: #fb7185;
+    --green: #9af7c3;
+    --shadow: rgba(0,0,0,.34);
+    --radius: 18px;
+    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+      "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    color: var(--text);
+    background:
+      radial-gradient(circle at 12% 0%, rgba(125,211,252,.16), transparent 32rem),
+      radial-gradient(circle at 88% 4%, rgba(240,171,252,.12), transparent 30rem),
+      linear-gradient(180deg, #10131a 0%, #0d1017 100%);
+  }
+
+  header {
+    max-width: 1320px;
+    margin: 0 auto;
+    padding: 24px 24px 12px;
+  }
+
+  h1 {
+    margin: 0 0 6px;
+    font-size: clamp(28px, 4vw, 54px);
+    letter-spacing: .02em;
+  }
+
+  .subtitle {
+    color: #c4d2ff;
+    max-width: 1120px;
+    line-height: 1.75;
+    font-size: 15px;
+  }
+
+  main {
+    max-width: 1320px;
+    margin: 0 auto;
+    padding: 18px 24px 36px;
+    display: grid;
+    grid-template-columns: minmax(0, 1.55fr) minmax(360px, .75fr);
+    gap: 18px;
+  }
+
+  @media (max-width: 940px) {
+    main { grid-template-columns: 1fr; }
+  }
+
+  .card {
+    background: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.012)), var(--panel);
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: var(--radius);
+    box-shadow: 0 18px 54px var(--shadow);
+    overflow: hidden;
+  }
+
+  .card h2 {
+    margin: 0;
+    padding: 15px 18px;
+    font-size: 16px;
+    border-bottom: 1px solid rgba(255,255,255,.08);
+    letter-spacing: .03em;
+  }
+
+  .card-body { padding: 16px; }
+
+  .graph-wrap {
+    position: relative;
+    height: min(63vh, 620px);
+    min-height: 430px;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01)),
+      #0e1118;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,.09);
+    overflow: hidden;
+  }
+
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+    cursor: crosshair;
+  }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 16px;
+    margin-top: 12px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  .legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .swatch {
+    width: 18px;
+    height: 3px;
+    border-radius: 999px;
+    display: inline-block;
+  }
+
+  .status {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-top: 12px;
+    color: #c7d2fe;
+    font-size: 12px;
+  }
+
+  @media (max-width: 700px) {
+    .status { grid-template-columns: 1fr 1fr; }
+  }
+
+  .pill {
+    padding: 9px 11px;
+    border-radius: 999px;
+    background: rgba(255,255,255,.055);
+    border: 1px solid rgba(255,255,255,.08);
+    font-variant-numeric: tabular-nums;
+  }
+
+  label {
+    display: block;
+    color: var(--muted);
+    font-size: 12px;
+    margin-bottom: 6px;
+  }
+
+  input[type="file"],
+  input[type="number"],
+  select,
+  button,
+  textarea {
+    width: 100%;
+    border: 1px solid rgba(255,255,255,.1);
+    background: var(--panel2);
+    color: var(--text);
+    border-radius: 11px;
+    padding: 10px 11px;
+    outline: none;
+  }
+
+  input[type="number"] {
+    font-variant-numeric: tabular-nums;
+  }
+
+  button {
+    cursor: pointer;
+    font-weight: 800;
+    transition: transform .08s ease, background .12s ease, border-color .12s ease;
+  }
+
+  button:hover {
+    background: #2d3445;
+    border-color: rgba(125,211,252,.55);
+  }
+
+  button:active { transform: translateY(1px); }
+
+  .primary {
+    background: linear-gradient(180deg, rgba(125,211,252,.28), rgba(125,211,252,.12)), #1a2935;
+    border-color: rgba(125,211,252,.55);
+  }
+
+  .danger {
+    background: linear-gradient(180deg, rgba(251,113,133,.22), rgba(251,113,133,.08)), #2e1d25;
+    border-color: rgba(251,113,133,.42);
+  }
+
+  .green {
+    background: linear-gradient(180deg, rgba(134,239,172,.22), rgba(134,239,172,.08)), #182c24;
+    border-color: rgba(134,239,172,.42);
+  }
+
+  input[type="range"] {
+    width: 100%;
+    accent-color: var(--accent);
+  }
+
+  .row {
+    display: grid;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .two { grid-template-columns: 1fr 1fr; }
+  .three { grid-template-columns: 1fr 1fr 1fr; }
+
+  @media (max-width: 560px) {
+    .two, .three { grid-template-columns: 1fr; }
+  }
+
+  .slider-row {
+    display: grid;
+    grid-template-columns: 92px 1fr 76px;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 9px;
+  }
+
+  .value {
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+
+  .section-title {
+    margin: 18px 0 10px;
+    color: #dbeafe;
+    font-weight: 900;
+    font-size: 13px;
+    letter-spacing: .04em;
+  }
+
+  .button-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .button-grid.three-cols {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .mini {
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1.65;
+  }
+
+  .note {
+    color: var(--muted);
+    line-height: 1.65;
+    font-size: 12px;
+    background: rgba(251,191,36,.08);
+    border: 1px solid rgba(251,191,36,.18);
+    padding: 10px 12px;
+    border-radius: 12px;
+  }
+
+  textarea {
+    min-height: 112px;
+    resize: vertical;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    font-size: 11px;
+  }
+
+  .node-list {
+    max-height: 140px;
+    overflow: auto;
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 12px;
+    background: rgba(255,255,255,.035);
+  }
+
+  .node-item {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+    padding: 9px 10px;
+    border-bottom: 1px solid rgba(255,255,255,.06);
+    cursor: pointer;
+    font-size: 12px;
+  }
+
+  .node-item:last-child { border-bottom: 0; }
+
+  .node-item.active {
+    background: rgba(125,211,252,.15);
+    color: #e0f2fe;
+  }
+
+  .node-item small {
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  code {
+    color: #bae6fd;
+  }
+</style>
+
+<style id="pro-ui-overrides">
+  :root {
+    --bg: #090b0f;
+    --panel: rgba(23, 27, 34, 0.94);
+    --panel2: rgba(32, 37, 46, 0.95);
+    --text: #eef2f8;
+    --muted: #a6afbf;
+    --accent: #f6c84d;
+    --accent2: #62d3ff;
+    --warn: #ffbf3d;
+    --green: #84f4b5;
+    --danger: #ff6b85;
+    --shadow: rgba(0,0,0,.50);
+    --radius: 22px;
+  }
+  body {
+    background:
+      radial-gradient(circle at 14% 0%, rgba(246,200,77,.16), transparent 28rem),
+      radial-gradient(circle at 92% 4%, rgba(98,211,255,.12), transparent 26rem),
+      linear-gradient(180deg, #0b0d11 0%, #080a0d 100%);
+  }
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+      repeating-linear-gradient(90deg, rgba(255,255,255,.012) 0 1px, transparent 1px 120px),
+      repeating-linear-gradient(180deg, rgba(255,255,255,.009) 0 1px, transparent 1px 120px);
+    opacity: .35;
+  }
+  header, main { max-width: 1420px; }
+  header { padding-top: 22px; }
+  h1 {
+    font-size: clamp(32px, 4vw, 58px);
+    font-weight: 900;
+    letter-spacing: .01em;
+    line-height: 1.03;
+  }
+  .subtitle { color: #cfd7e6; font-size: 14px; }
+  main { grid-template-columns: minmax(0, 1.75fr) minmax(360px, .72fr); }
+  .card {
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.012)),
+      linear-gradient(180deg, rgba(255,255,255,.01), rgba(0,0,0,.10)),
+      var(--panel);
+    border: 1px solid rgba(255,255,255,.07);
+    border-radius: 22px;
+    box-shadow: 0 26px 70px var(--shadow);
+    backdrop-filter: blur(8px);
+  }
+  .card h2 {
+    font-size: 12px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: #e3e7ee;
+    background: linear-gradient(180deg, rgba(255,255,255,.028), rgba(255,255,255,.008));
+  }
+  .graph-wrap {
+    min-height: 500px;
+    height: min(70vh, 720px);
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,.08);
+    background:
+      radial-gradient(circle at 50% -10%, rgba(246,200,77,.11), transparent 42%),
+      radial-gradient(circle at 85% 20%, rgba(98,211,255,.08), transparent 34%),
+      linear-gradient(180deg, #080c13 0%, #090d13 46%, #090c12 100%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.045), inset 0 -16px 30px rgba(0,0,0,.34);
+  }
+  .graph-wrap::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0)),
+      repeating-linear-gradient(90deg, rgba(255,255,255,.018) 0 1px, transparent 1px 86px),
+      repeating-linear-gradient(180deg, rgba(255,255,255,.016) 0 1px, transparent 1px 76px);
+    opacity: .55;
+  }
+  .graph-hud {
+    position: absolute;
+    top: 10px;
+    z-index: 3;
+    pointer-events: none;
+    padding: 7px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,.08);
+    background: rgba(8,10,14,.58);
+    color: rgba(235,239,247,.88);
+    font-size: 11px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    backdrop-filter: blur(8px);
+    box-shadow: 0 8px 22px rgba(0,0,0,.26);
+  }
+  .graph-hud.left { left: 12px; }
+  .graph-hud.right { right: 12px; }
+  canvas { position: relative; z-index: 2; }
+
+  @media (max-width: 940px) {
+    main { grid-template-columns: minmax(0, 1fr); }
+  }
+
+  @media (max-width: 560px) {
+    header { padding: 18px 14px 10px; }
+    main {
+      padding: 14px 14px 28px;
+      gap: 14px;
+    }
+    .graph-wrap {
+      min-height: 360px;
+      height: min(62vh, 520px);
+    }
+  }
+
+  .legend span {
+    padding: 4px 9px;
+    border-radius: 999px;
+    background: rgba(255,255,255,.03);
+    border: 1px solid rgba(255,255,255,.05);
+  }
+  .pill {
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.018));
+    border: 1px solid rgba(255,255,255,.07);
+    color: #d4dae6;
+  }
+  label {
+    font-size: 11px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+  input[type="file"], input[type="number"], select, button, textarea {
+    border: 1px solid rgba(255,255,255,.09);
+    background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02)), rgba(31,36,44,.95);
+    border-radius: 13px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.025);
+  }
+  button:hover { border-color: rgba(246,200,77,.45); box-shadow: 0 10px 28px rgba(0,0,0,.24); }
+  .primary { background: linear-gradient(180deg, rgba(246,200,77,.22), rgba(246,200,77,.08)), rgba(42,34,16,.96); border-color: rgba(246,200,77,.34); color: #fff5d2; }
+  .danger { background: linear-gradient(180deg, rgba(255,107,133,.18), rgba(255,107,133,.08)), rgba(41,24,29,.96); border-color: rgba(255,107,133,.30); }
+  .green { background: linear-gradient(180deg, rgba(132,244,181,.18), rgba(132,244,181,.06)), rgba(20,38,29,.95); border-color: rgba(132,244,181,.28); color: #e7fff1; }
+  input[type="range"] { accent-color: var(--accent); }
+  .slider-row {
+    padding: 7px 9px;
+    border-radius: 14px;
+    background: rgba(255,255,255,.024);
+    border: 1px solid rgba(255,255,255,.045);
+  }
+  .section-title {
+    color: #eff3f8;
+    font-size: 11px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+  }
+  .mini, .note {
+    border-radius: 13px;
+    background: rgba(255,255,255,.024);
+    border: 1px solid rgba(255,255,255,.045);
+  }
+  .note { background: rgba(246,200,77,.07); border-color: rgba(246,200,77,.16); }
+  .node-list { border-radius: 14px; background: rgba(255,255,255,.026); }
+  .node-item.active { background: linear-gradient(180deg, rgba(246,200,77,.14), rgba(246,200,77,.08)); color: #fff6d9; }
+  code { color: #ffda7f; }
+</style>
+
+</head>
+<body>
+<header>
+  <h1>Graphic Group Delay EQ v6</h1>
+  <div class="subtitle">
+    Pro-Q系のダークで洗練された見た目を意識して、表示をよりミニマルで見やすく調整した版です。
+    ノードを横へドラッグして周波数、上下で遅延量、左右ハンドルで範囲を編集できます。
+    Global Delay は pure delay、周波数依存の差分は all-pass biquad cascade で近似します。
+  </div>
+</header>
+
+<main>
+  <section class="card">
+    <h2>Display</h2>
+    <div class="card-body">
+      <div class="graph-wrap">
+        <div class="graph-hud left">Phase / Group Delay Editor</div>
+        <div class="graph-hud right">Drag node · Wheel = Width</div>
+        <canvas id="graph"></canvas>
+      </div>
+
+      <div class="legend">
+        <span><i class="swatch" style="background: var(--accent)"></i>Target delay</span>
+        <span><i class="swatch" style="background: var(--accent2)"></i>Actual all-pass approximation</span>
+        <span><i class="swatch" style="background: var(--warn)"></i>Band node / width handles</span>
+        <span><i class="swatch" style="background: var(--green)"></i>Scale peak guides</span>
+      </div>
+
+      <div class="status">
+        <div class="pill" id="sectionCount">All-pass sections: 0</div>
+        <div class="pill" id="baseDelayHint">Pure delay: 0.0 ms</div>
+        <div class="pill" id="fitHint">Fit RMS error: 0.0 ms</div>
+        <div class="pill" id="audioState">Audio: no file</div>
+        <div class="pill" id="srState">Sample rate: -</div>
+        <div class="pill" id="selectedHint">Selected: none</div>
+      </div>
+    </div>
+  </section>
+
+  <aside class="card">
+    <h2>Inspector / Tools</h2>
+    <div class="card-body">
+      <div class="row">
+        <label>Audio file</label>
+        <input id="file" type="file" accept="audio/*" />
+      </div>
+
+      <div class="row">
+        <label>Built-in test source</label>
+        <select id="testSource">
+          <option value="clicks">Click train - transient smear check</option>
+          <option value="impulse">Single impulse - impulse response check</option>
+          <option value="sweep">Log sine sweep - frequency/time sweep</option>
+          <option value="noise">White noise bursts - phase texture check</option>
+          <option value="kick">Kick-like transient - low band delay check</option>
+          <option value="snare">Snare-like transient - mid/high smear check</option>
+          <option value="chord">Saw chord stab - harmonic dispersion check</option>
+          <option value="loop">Mini drum loop - musical groove check</option>
+        </select>
+      </div>
+
+      <div class="row two">
+        <button id="loadTest" class="primary">Load Test Source</button>
+        <button id="play" class="primary">Play</button>
+      </div>
+
+      <div class="row two">
+        <button id="stop" class="danger">Stop</button>
+        <button id="rebuild">Rebuild Fit</button>
+      </div>
+
+      <div class="row">
+        <label><input id="loop" type="checkbox" checked /> Loop playback</label>
+      </div>
+
+      <div class="section-title">Global / View</div>
+
+      <div class="slider-row">
+        <span>Global</span>
+        <input id="globalDelay" type="range" min="0" max="1000" value="0" step="1" />
+        <span class="value" id="globalDelayVal">0 ms</span>
+      </div>
+
+      <div class="slider-row">
+        <span>Graph max</span>
+        <input id="maxMs" type="range" min="50" max="1000" value="1000" step="1" />
+        <span class="value" id="maxMsVal">1000 ms</span>
+      </div>
+
+      <div class="slider-row">
+        <span>Wet</span>
+        <input id="wet" type="range" min="0" max="100" value="100" step="1" />
+        <span class="value" id="wetVal">100%</span>
+      </div>
+
+      <div class="slider-row">
+        <span>Max SOS</span>
+        <input id="maxSections" type="range" min="8" max="4096" value="1024" step="1" />
+        <span class="value" id="maxSectionsVal">1024</span>
+      </div>
+
+      <div class="mini">
+        <code>Global</code> は全体をそのまま遅らせる pure delay です。
+        周波数ごとの差分だけ all-pass 段で近似するため、全体を大きく遅らせてもSOSを消費しません。
+      </div>
+
+      <div class="section-title">Add Nodes</div>
+      <div class="button-grid">
+        <button id="addBell">+ Bell Delay</button>
+        <button id="addLowShelf">+ Low Shelf</button>
+        <button id="addHighShelf">+ High Shelf</button>
+        <button id="addScale" class="green">+ Pentatonic</button>
+      </div>
+
+      <div class="section-title">Node List</div>
+      <div class="node-list" id="nodeList"></div>
+
+      <div class="section-title">Selected Node</div>
+
+      <div class="row two">
+        <div>
+          <label>Type</label>
+          <select id="nodeType">
+            <option value="bell">Bell Delay</option>
+            <option value="lowShelf">Low Delay Shelf</option>
+            <option value="highShelf">High Delay Shelf</option>
+            <option value="scale">Scale / Pentatonic Peaks</option>
+          </select>
+        </div>
+        <div>
+          <label>Frequency / Root anchor Hz</label>
+          <input id="nodeFreq" type="number" min="20" max="20000" step="0.1" value="1000" />
+        </div>
+      </div>
+
+      <div class="slider-row">
+        <span>Amount</span>
+        <input id="nodeAmount" type="range" min="0" max="1000" value="250" step="1" />
+        <span class="value" id="nodeAmountVal">250 ms</span>
+      </div>
+
+      <div class="slider-row">
+        <span>Width</span>
+        <input id="nodeWidth" type="range" min="0.03" max="6" value="1.0" step="0.01" />
+        <span class="value" id="nodeWidthVal">1.00 oct</span>
+      </div>
+
+      <div class="row two">
+        <div>
+          <label>Scale root</label>
+          <select id="scaleRoot">
+            <option value="0">C</option><option value="1">C#</option><option value="2">D</option>
+            <option value="3">D#</option><option value="4">E</option><option value="5">F</option>
+            <option value="6">F#</option><option value="7">G</option><option value="8">G#</option>
+            <option value="9" selected>A</option><option value="10">A#</option><option value="11">B</option>
+          </select>
+        </div>
+        <div>
+          <label>Scale</label>
+          <select id="scaleMode">
+            <option value="minorPentatonic" selected>Minor pentatonic</option>
+            <option value="majorPentatonic">Major pentatonic</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row two">
+        <button id="duplicateNode">Duplicate</button>
+        <button id="removeNode" class="danger">Remove</button>
+      </div>
+
+      <div class="section-title">Presets</div>
+      <div class="button-grid three-cols">
+        <button data-preset="flat">Flat</button>
+        <button data-preset="global">Big Global</button>
+        <button data-preset="disperser">Disperser</button>
+        <button data-preset="vocal">Vocal Air</button>
+        <button data-preset="pentatonic">A minor Penta</button>
+        <button data-preset="bass">Bass Push</button>
+      </div>
+
+      <div class="section-title">Patch JSON</div>
+      <div class="row two">
+        <button id="copyPatch">Copy Patch</button>
+        <button id="loadPatch">Load Patch</button>
+      </div>
+      <textarea id="patch" spellcheck="false"></textarea>
+
+      <div class="note">
+        操作: ノード中央をドラッグすると周波数/遅延量を移動。選択ノードの左右ハンドルをドラッグすると範囲を変更。
+        Scale Node はペンタトニック上の周波数ピークだけに遅延カーブを作ります。
+        再生中の変更は旧チェーンと新チェーンを短くクロスフェードします。
+      </div>
+    </div>
+  </aside>
+</main>
+
+<script>
+(() => {
+  "use strict";
+
+  const minFreq = 20;
+  const maxFreq = 20000;
+  const noteNames = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+
+  const state = {
+    globalDelayMs: 0,
+    maxMs: 1000,
+    wet: 1.0,
+    maxSections: 1024,
+    nodes: [],
+    selectedNodeId: null,
+    sections: [],
+    baseDelayMs: 0,
+    fitErrorMs: 0,
+    drag: null,
+    nextNodeId: 1
+  };
+
+  let ctx = null;
+  let audioBuffer = null;
+  let source = null;
+  let inputGain = null;
+  let dryGain = null;
+  let outputGain = null;
+  let wetChains = [];
+  let rebuildTimer = null;
+  let startedAt = 0;
+  let pausedAt = 0;
+  let isPlaying = false;
+  let lastDrawSize = { w: 1, h: 1 };
+
+  const $ = (id) => document.getElementById(id);
+  const graph = $("graph");
+  const g = graph.getContext("2d");
+
+  const fileEl = $("file");
+  const testSourceEl = $("testSource");
+  const loadTestBtn = $("loadTest");
+  const playBtn = $("play");
+  const stopBtn = $("stop");
+  const rebuildBtn = $("rebuild");
+  const loopEl = $("loop");
+
+  const globalDelayEl = $("globalDelay");
+  const maxMsEl = $("maxMs");
+  const wetEl = $("wet");
+  const maxSectionsEl = $("maxSections");
+
+  const nodeListEl = $("nodeList");
+  const nodeTypeEl = $("nodeType");
+  const nodeFreqEl = $("nodeFreq");
+  const nodeAmountEl = $("nodeAmount");
+  const nodeWidthEl = $("nodeWidth");
+  const scaleRootEl = $("scaleRoot");
+  const scaleModeEl = $("scaleMode");
+  const patchEl = $("patch");
+
+  function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function log2(x) { return Math.log(x) / Math.log(2); }
+
+  function ensureAudioContext() {
+    if (!ctx) {
+      ctx = new (window.AudioContext || window.webkitAudioContext)();
+      $("srState").textContent = "Sample rate: " + Math.round(ctx.sampleRate) + " Hz";
+    }
+    return ctx;
+  }
+
+  function freqToX(freq, width, pad) {
+    const l0 = Math.log10(minFreq);
+    const l1 = Math.log10(maxFreq);
+    const t = (Math.log10(clamp(freq, minFreq, maxFreq)) - l0) / (l1 - l0);
+    return pad.l + t * (width - pad.l - pad.r);
+  }
+
+  function xToFreq(x, width, pad) {
+    const t = clamp((x - pad.l) / (width - pad.l - pad.r), 0, 1);
+    const l0 = Math.log10(minFreq);
+    const l1 = Math.log10(maxFreq);
+    return Math.pow(10, lerp(l0, l1, t));
+  }
+
+  function msToY(ms, height, pad) {
+    const t = clamp(ms / state.maxMs, 0, 1);
+    return height - pad.b - t * (height - pad.t - pad.b);
+  }
+
+  function yToMs(y, height, pad) {
+    const t = clamp((height - pad.b - y) / (height - pad.t - pad.b), 0, 1);
+    return t * state.maxMs;
+  }
+
+  function fmtFreq(f) {
+    if (f >= 1000) return (f / 1000).toFixed(f >= 10000 ? 0 : 1).replace(".0","") + "k";
+    return String(Math.round(f));
+  }
+
+  function fmtNode(node) {
+    if (!node) return "none";
+    if (node.type === "scale") {
+      return `${node.name}: ${noteNames[node.root]} ${node.mode === "majorPentatonic" ? "major" : "minor"} penta, ${node.amountMs.toFixed(0)}ms`;
+    }
+    return `${node.name}: ${fmtFreq(node.freqHz)}Hz, ${node.amountMs.toFixed(0)}ms, ${node.widthOct.toFixed(2)}oct`;
+  }
+
+  function octBandwidthToQ(widthOct) {
+    const bw = clamp(widthOct, 0.03, 8);
+    const p = Math.pow(2, bw);
+    return clamp(Math.sqrt(p) / Math.max(p - 1, 1e-6), 0.08, 240);
+  }
+
+  function makeNode(type, opts = {}) {
+    const id = state.nextNodeId++;
+    const defaults = {
+      id,
+      type,
+      name: type === "scale" ? "Pentatonic" :
+            type === "lowShelf" ? "Low Shelf" :
+            type === "highShelf" ? "High Shelf" : "Bell",
+      freqHz: 1000,
+      amountMs: 250,
+      widthOct: type === "scale" ? 0.10 : 1.0,
+      root: 9,
+      mode: "minorPentatonic",
+      enabled: true
+    };
+    return Object.assign(defaults, opts, { id });
+  }
+
+  function selectedNode() {
+    return state.nodes.find(n => n.id === state.selectedNodeId) || null;
+  }
+
+  function selectNode(id) {
+    state.selectedNodeId = id;
+    syncSelectedControls();
+    renderNodeList();
+    draw();
+  }
+
+  function addNode(type, opts = {}) {
+    const node = makeNode(type, opts);
+    state.nodes.push(node);
+    selectNode(node.id);
+    scheduleRebuild();
+    return node;
+  }
+
+  function removeSelectedNode() {
+    const node = selectedNode();
+    if (!node) return;
+    state.nodes = state.nodes.filter(n => n.id !== node.id);
+    state.selectedNodeId = state.nodes.length ? state.nodes[state.nodes.length - 1].id : null;
+    syncSelectedControls();
+    renderNodeList();
+    scheduleRebuild();
+  }
+
+  function duplicateSelectedNode() {
+    const node = selectedNode();
+    if (!node) return;
+    const copy = Object.assign({}, node, {
+      name: node.name + " Copy",
+      freqHz: clamp(node.freqHz * 1.25, minFreq, maxFreq)
+    });
+    delete copy.id;
+    addNode(node.type, copy);
+  }
+
+  function scaleIntervals(mode) {
+    return mode === "majorPentatonic" ? [0, 2, 4, 7, 9] : [0, 3, 5, 7, 10];
+  }
+
+  function midiToFreq(m) {
+    return 440 * Math.pow(2, (m - 69) / 12);
+  }
+
+  function scaleFrequencies(node) {
+    const intervals = scaleIntervals(node.mode);
+    const out = [];
+    for (let octave = -2; octave <= 10; octave++) {
+      const baseMidi = 12 * (octave + 1) + node.root;
+      for (const iv of intervals) {
+        const f = midiToFreq(baseMidi + iv);
+        if (f >= minFreq * 0.75 && f <= maxFreq * 1.25) out.push(f);
+      }
+    }
+    return out.sort((a, b) => a - b);
+  }
+
+  function bellShape(freq, center, widthOct) {
+    const sigma = Math.max(widthOct, 0.03) / 2.355; // FWHM-ish
+    const d = log2(freq / center);
+    return Math.exp(-0.5 * (d / sigma) * (d / sigma));
+  }
+
+  function shelfShape(freq, cutoff, widthOct, isHigh) {
+    const w = Math.max(widthOct, 0.03);
+    const x = log2(freq / cutoff) / w;
+    const k = 5.4;
+    const hi = 1 / (1 + Math.exp(-k * x));
+    return isHigh ? hi : 1 - hi;
+  }
+
+  function scaleShape(freq, node) {
+    const sigma = Math.max(node.widthOct, 0.01);
+    let best = 0;
+    for (const sf of scaleFrequencies(node)) {
+      const d = Math.abs(log2(freq / sf));
+      const v = Math.exp(-0.5 * (d / sigma) * (d / sigma));
+      if (v > best) best = v;
+    }
+    return best;
+  }
+
+  function nodeValueAtFreq(node, freq) {
+    if (!node.enabled) return 0;
+    let shape = 0;
+    if (node.type === "bell") shape = bellShape(freq, node.freqHz, node.widthOct);
+    else if (node.type === "lowShelf") shape = shelfShape(freq, node.freqHz, node.widthOct, false);
+    else if (node.type === "highShelf") shape = shelfShape(freq, node.freqHz, node.widthOct, true);
+    else if (node.type === "scale") shape = scaleShape(freq, node);
+    return node.amountMs * shape;
+  }
+
+  function targetAtFreq(freq) {
+    let v = state.globalDelayMs;
+    for (const node of state.nodes) v += nodeValueAtFreq(node, freq);
+    return clamp(v, 0, state.maxMs);
+  }
+
+  function biquadAllpassCoeffs(f0, q, fs) {
+    const w0 = 2 * Math.PI * clamp(f0, 1, fs * 0.49) / fs;
+    const alpha = Math.sin(w0) / (2 * clamp(q, 0.0001, 1000));
+    const cosw = Math.cos(w0);
+    const a0 = 1 + alpha;
+    return {
+      b0: (1 - alpha) / a0,
+      b1: (-2 * cosw) / a0,
+      b2: (1 + alpha) / a0,
+      a1: (-2 * cosw) / a0,
+      a2: (1 - alpha) / a0
+    };
+  }
+
+  function phaseAt(coeff, f, fs) {
+    const w = 2 * Math.PI * clamp(f, 1, fs * 0.49) / fs;
+    const c1 = Math.cos(-w), s1 = Math.sin(-w);
+    const c2 = Math.cos(-2 * w), s2 = Math.sin(-2 * w);
+    const nr = coeff.b0 + coeff.b1 * c1 + coeff.b2 * c2;
+    const ni = coeff.b1 * s1 + coeff.b2 * s2;
+    const dr = 1 + coeff.a1 * c1 + coeff.a2 * c2;
+    const di = coeff.a1 * s1 + coeff.a2 * s2;
+    const hr = nr * dr + ni * di;
+    const hi = ni * dr - nr * di;
+    return Math.atan2(hi, hr);
+  }
+
+  function unwrapDelta(d) {
+    while (d > Math.PI) d -= 2 * Math.PI;
+    while (d < -Math.PI) d += 2 * Math.PI;
+    return d;
+  }
+
+  function groupDelayMsOne(f, f0, q, fs) {
+    const df = clamp(f * 0.0015, 0.25, 40);
+    const fA = clamp(f - df, 1, fs * 0.49);
+    const fB = clamp(f + df, 1, fs * 0.49);
+    const c = biquadAllpassCoeffs(f0, q, fs);
+    const pA = phaseAt(c, fA, fs);
+    const pB = phaseAt(c, fB, fs);
+    const dPhi = unwrapDelta(pB - pA);
+    const dOmega = 2 * Math.PI * (fB - fA) / fs;
+    const samples = -dPhi / dOmega;
+    return Math.max(0, samples / fs * 1000);
+  }
+
+  function actualAtFreq(freq) {
+    const fs = ctx ? ctx.sampleRate : 48000;
+    let ms = state.baseDelayMs || 0;
+    for (const s of state.sections) {
+      ms += s.count * groupDelayMsOne(freq, s.freq, s.q, fs);
+    }
+    return clamp(ms, 0, state.maxMs);
+  }
+
+  function buildCandidateCenters(fs) {
+    const set = new Map();
+    function add(f, preferredQ = null) {
+      const cf = clamp(f, minFreq, Math.min(maxFreq, fs * 0.45));
+      const key = Math.round(cf * 100) / 100;
+      if (!set.has(key)) set.set(key, { freq: cf, preferredQ });
+      else if (preferredQ) set.get(key).preferredQ = preferredQ;
+    }
+
+    // Basic log grid for shelves and broad shapes.
+    for (let i = 0; i < 36; i++) {
+      const t = i / 35;
+      add(Math.pow(10, lerp(Math.log10(minFreq), Math.log10(Math.min(maxFreq, fs * 0.45)), t)));
+    }
+
+    for (const node of state.nodes) {
+      if (!node.enabled) continue;
+
+      if (node.type === "scale") {
+        const q = octBandwidthToQ(node.widthOct * 2.2);
+        for (const f of scaleFrequencies(node)) {
+          if (f >= minFreq && f <= Math.min(maxFreq, fs * 0.45)) add(f, q);
+        }
+      } else {
+        const q = octBandwidthToQ(node.widthOct);
+        add(node.freqHz, q);
+        add(node.freqHz / Math.pow(2, node.widthOct * 0.5), q * 0.75);
+        add(node.freqHz * Math.pow(2, node.widthOct * 0.5), q * 0.75);
+      }
+    }
+
+    return [...set.values()].sort((a, b) => a.freq - b.freq);
+  }
+
+  function buildPatch() {
+    const fs = ctx ? ctx.sampleRate : 48000;
+    const topFreq = Math.min(maxFreq, fs * 0.45);
+
+    const gridN = 128;
+    const freqs = [];
+    const target = [];
+    const weights = [];
+
+    for (let k = 0; k < gridN; k++) {
+      const t = k / (gridN - 1);
+      const f = Math.pow(10, lerp(Math.log10(minFreq), Math.log10(topFreq), t));
+      freqs.push(f);
+      target.push(targetAtFreq(f));
+      weights.push(1.0);
+    }
+
+    // 全帯域の共通成分はpure delayとして抽出。
+    const minTarget = Math.min(...target);
+    state.baseDelayMs = clamp(minTarget, 0, 1000);
+    const residual = target.map(v => Math.max(0, v - state.baseDelayMs));
+
+    const centers = buildCandidateCenters(fs);
+    const candidates = [];
+
+    for (const c of centers) {
+      const qs = [];
+      if (c.preferredQ) qs.push(c.preferredQ);
+      qs.push(0.35, 0.7, 1.4, 3.0, 7.0, 16.0, 42.0);
+
+      const uniqueQ = [...new Set(qs.map(q => Math.round(clamp(q, 0.08, 240) * 1000) / 1000))];
+
+      for (const q of uniqueQ) {
+        const curve = freqs.map(f => groupDelayMsOne(f, c.freq, q, fs));
+        let energy = 0;
+        for (let k = 0; k < gridN; k++) energy += weights[k] * curve[k] * curve[k];
+        if (energy > 1e-9) candidates.push({ freq: c.freq, q, count: 0, curve, energy });
+      }
+    }
+
+    let actual = new Array(gridN).fill(0);
+    const maxIter = Math.max(0, state.maxSections | 0);
+
+    for (let iter = 0; iter < maxIter; iter++) {
+      let best = -1;
+      let bestImprovement = 0;
+
+      for (let c = 0; c < candidates.length; c++) {
+        const cand = candidates[c];
+        let dot = 0;
+        let energy = 0;
+
+        for (let k = 0; k < gridN; k++) {
+          const r = residual[k] - actual[k];
+          const cv = cand.curve[k];
+          dot += weights[k] * r * cv;
+          energy += weights[k] * cv * cv;
+        }
+
+        const improvement = 2 * dot - energy;
+        if (improvement > bestImprovement) {
+          bestImprovement = improvement;
+          best = c;
+        }
+      }
+
+      if (best < 0) break;
+      const chosen = candidates[best];
+      chosen.count += 1;
+      for (let k = 0; k < gridN; k++) actual[k] += chosen.curve[k];
+    }
+
+    const grouped = new Map();
+    for (const c of candidates) {
+      if (c.count <= 0) continue;
+      const key = `${c.freq.toFixed(2)}_${c.q.toFixed(3)}`;
+      if (!grouped.has(key)) grouped.set(key, { freq: c.freq, q: c.q, count: 0 });
+      grouped.get(key).count += c.count;
+    }
+
+    state.sections = [...grouped.values()];
+
+    let err = 0;
+    for (let k = 0; k < gridN; k++) {
+      const e = residual[k] - actual[k];
+      err += weights[k] * e * e;
+    }
+    state.fitErrorMs = Math.sqrt(err / gridN);
+
+    updateReadouts();
+    scheduleAudioGraphRefresh();
+    updatePatchText();
+    draw();
+  }
+
+  function scheduleRebuild(delayMs = 85) {
+    if (rebuildTimer) clearTimeout(rebuildTimer);
+    rebuildTimer = setTimeout(() => {
+      rebuildTimer = null;
+      buildPatch();
+    }, delayMs);
+    updateReadouts();
+    updatePatchText();
+    draw();
+  }
+
+  function createMonoBuffer(seconds, generator) {
+    const ac = ensureAudioContext();
+    const length = Math.max(1, Math.floor(seconds * ac.sampleRate));
+    const buffer = ac.createBuffer(1, length, ac.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < length; i++) {
+      const t = i / ac.sampleRate;
+      data[i] = clamp(generator(t, i, ac.sampleRate), -1, 1);
+    }
+    return buffer;
+  }
+
+  function createStereoBuffer(seconds, generator) {
+    const ac = ensureAudioContext();
+    const length = Math.max(1, Math.floor(seconds * ac.sampleRate));
+    const buffer = ac.createBuffer(2, length, ac.sampleRate);
+    const l = buffer.getChannelData(0);
+    const r = buffer.getChannelData(1);
+    for (let i = 0; i < length; i++) {
+      const t = i / ac.sampleRate;
+      const v = generator(t, i, ac.sampleRate);
+      if (Array.isArray(v)) {
+        l[i] = clamp(v[0], -1, 1);
+        r[i] = clamp(v[1], -1, 1);
+      } else {
+        l[i] = clamp(v, -1, 1);
+        r[i] = clamp(v, -1, 1);
+      }
+    }
+    return buffer;
+  }
+
+  function envPerc(t, attack, decay) {
+    if (t < 0) return 0;
+    if (t < attack) return t / Math.max(attack, 1e-6);
+    return Math.exp(-(t - attack) / Math.max(decay, 1e-6));
+  }
+
+  function noise() { return Math.random() * 2 - 1; }
+  function softClip(x) { return Math.tanh(x); }
+
+  function generateTestBuffer(kind) {
+    const ac = ensureAudioContext();
+    const sr = ac.sampleRate;
+
+    if (kind === "impulse") {
+      const buffer = createMonoBuffer(2.0, () => 0);
+      const d = buffer.getChannelData(0);
+      d[0] = 0.95;
+      d[Math.floor(sr * 0.5)] = 0.55;
+      d[Math.floor(sr * 1.0)] = 0.35;
+      return { buffer, label: "Single impulse" };
+    }
+
+    if (kind === "clicks") {
+      const buffer = createMonoBuffer(4.0, (t) => {
+        const beat = 0.25;
+        const p = t % beat;
+        const click = Math.exp(-p / 0.0025) * Math.sin(2 * Math.PI * 2200 * p);
+        const sub = Math.exp(-p / 0.012) * Math.sin(2 * Math.PI * 120 * p);
+        return 0.75 * click + 0.25 * sub;
+      });
+      return { buffer, label: "Click train" };
+    }
+
+    if (kind === "sweep") {
+      const duration = 6.0;
+      const f0 = 30;
+      const f1 = Math.min(18000, sr * 0.42);
+      const k = Math.log(f1 / f0) / duration;
+      let phase = 0;
+      const buffer = createMonoBuffer(duration, (t, i) => {
+        const f = f0 * Math.exp(k * t);
+        phase += 2 * Math.PI * f / sr;
+        const fadeIn = clamp(t / 0.06, 0, 1);
+        const fadeOut = clamp((duration - t) / 0.12, 0, 1);
+        return 0.65 * Math.sin(phase) * fadeIn * fadeOut;
+      });
+      return { buffer, label: "Log sine sweep" };
+    }
+
+    if (kind === "noise") {
+      const buffer = createStereoBuffer(5.0, (t) => {
+        const period = 0.5;
+        const p = t % period;
+        const burst = p < 0.18 ? envPerc(p, 0.004, 0.055) : 0;
+        const n = noise();
+        const lfo = 0.5 + 0.5 * Math.sin(2 * Math.PI * 0.37 * t);
+        return [0.42 * burst * n, 0.42 * burst * noise() * (0.6 + 0.4 * lfo)];
+      });
+      return { buffer, label: "White noise bursts" };
+    }
+
+    if (kind === "kick") {
+      const buffer = createMonoBuffer(4.0, (t) => {
+        const beat = 0.5;
+        const p = t % beat;
+        const amp = envPerc(p, 0.002, 0.16);
+        const f = 42 + 130 * Math.exp(-p / 0.035);
+        const body = Math.sin(2 * Math.PI * f * p);
+        const click = Math.exp(-p / 0.004) * Math.sin(2 * Math.PI * 2600 * p);
+        return softClip(1.2 * amp * body + 0.28 * click);
+      });
+      return { buffer, label: "Kick-like transient" };
+    }
+
+    if (kind === "snare") {
+      const buffer = createMonoBuffer(4.0, (t) => {
+        const beat = 0.5;
+        const p = t % beat;
+        const tone = Math.sin(2 * Math.PI * 190 * p) * envPerc(p, 0.002, 0.08);
+        const noisey = noise() * envPerc(p, 0.001, 0.055);
+        const snap = Math.sin(2 * Math.PI * 3400 * p) * Math.exp(-p / 0.006);
+        return softClip(0.3 * tone + 0.62 * noisey + 0.25 * snap);
+      });
+      return { buffer, label: "Snare-like transient" };
+    }
+
+    if (kind === "chord") {
+      const freqs = [261.63, 329.63, 392.00, 493.88, 739.99];
+      const buffer = createStereoBuffer(5.0, (t) => {
+        const beat = 0.75;
+        const p = t % beat;
+        const amp = p < 0.32 ? envPerc(p, 0.01, 0.22) : 0;
+        let l = 0, r = 0;
+        for (let j = 0; j < freqs.length; j++) {
+          const f = freqs[j];
+          const saw = 2 * ((p * f) % 1) - 1;
+          const s = 0.55 * saw + 0.35 * Math.sin(2 * Math.PI * f * p);
+          l += s * (j % 2 ? 0.8 : 1.0);
+          r += s * (j % 2 ? 1.0 : 0.8);
+        }
+        return [softClip((l / freqs.length) * amp * 1.3), softClip((r / freqs.length) * amp * 1.3)];
+      });
+      return { buffer, label: "Saw chord stab" };
+    }
+
+    if (kind === "loop") {
+      const bpm = 132;
+      const beatSec = 60 / bpm;
+      const barSec = beatSec * 4;
+      const duration = barSec * 4;
+      function hat(t, pos, gain) {
+        let p = t - pos;
+        if (p < 0 || p > 0.055) return 0;
+        return gain * noise() * Math.exp(-p / 0.018);
+      }
+      const buffer = createStereoBuffer(duration, (t) => {
+        const tb = t % barSec;
+        let v = 0;
+        [0, beatSec * 1.5, beatSec * 2.75].forEach(pos => {
+          const p = tb - pos;
+          if (p >= 0 && p < 0.25) {
+            const f = 45 + 110 * Math.exp(-p / 0.035);
+            v += 0.9 * Math.exp(-p / 0.13) * Math.sin(2 * Math.PI * f * p);
+            v += 0.15 * Math.exp(-p / 0.004) * Math.sin(2 * Math.PI * 2400 * p);
+          }
+        });
+        [beatSec, beatSec * 3].forEach(pos => {
+          const p = tb - pos;
+          if (p >= 0 && p < 0.18) {
+            v += 0.45 * noise() * Math.exp(-p / 0.045);
+            v += 0.18 * Math.sin(2 * Math.PI * 210 * p) * Math.exp(-p / 0.08);
+          }
+        });
+        for (let k = 0; k < 8; k++) v += hat(tb, k * beatSec / 2, k % 2 ? 0.13 : 0.2);
+        const p = tb % beatSec;
+        v += 0.18 * Math.sin(2 * Math.PI * 55 * p) * Math.exp(-p / 0.18);
+        const pan = 0.08 * Math.sin(2 * Math.PI * t / duration);
+        return [softClip(v * (0.95 - pan)), softClip(v * (0.95 + pan))];
+      });
+      return { buffer, label: "Mini drum loop" };
+    }
+
+    return generateTestBuffer("clicks");
+  }
+
+  function loadTestSource(kind) {
+    stopAll();
+    const generated = generateTestBuffer(kind);
+    audioBuffer = generated.buffer;
+    pausedAt = 0;
+    $("audioState").textContent = "Audio: test - " + generated.label;
+    $("srState").textContent = "Sample rate: " + Math.round(ensureAudioContext().sampleRate) + " Hz";
+    buildPatch();
+  }
+
+  async function loadFile(file) {
+    const ac = ensureAudioContext();
+    const data = await file.arrayBuffer();
+    audioBuffer = await ac.decodeAudioData(data);
+    pausedAt = 0;
+    $("audioState").textContent = "Audio: " + file.name;
+    buildPatch();
+  }
+
+  function stopSourceOnly() {
+    if (source) {
+      try { source.stop(); } catch (_) {}
+      try { source.disconnect(); } catch (_) {}
+    }
+    source = null;
+  }
+
+  function smoothParam(param, value, time = 0.035) {
+    const ac = ensureAudioContext();
+    const now = ac.currentTime;
+    try {
+      param.cancelScheduledValues(now);
+      param.setValueAtTime(param.value, now);
+      param.linearRampToValueAtTime(value, now + time);
+    } catch (_) {
+      param.value = value;
+    }
+  }
+
+  function disconnectWetChain(chain) {
+    if (!chain || chain.disconnected) return;
+    chain.disconnected = true;
+    try {
+      if (inputGain && chain.entry) inputGain.disconnect(chain.entry);
+    } catch (_) {}
+    for (const node of chain.nodes || []) {
+      try { node.disconnect(); } catch (_) {}
+    }
+    try { chain.gain.disconnect(); } catch (_) {}
+  }
+
+  function cleanupPlaybackGraph() {
+    for (const chain of wetChains) disconnectWetChain(chain);
+    wetChains = [];
+    if (dryGain) {
+      try { dryGain.disconnect(); } catch (_) {}
+    }
+    if (inputGain) {
+      try { inputGain.disconnect(); } catch (_) {}
+    }
+    if (outputGain) {
+      try { outputGain.disconnect(); } catch (_) {}
+    }
+    dryGain = null;
+    inputGain = null;
+    outputGain = null;
+  }
+
+  function flattenSections(sections) {
+    const out = [];
+    for (const s of sections) {
+      for (let i = 0; i < s.count; i++) out.push({ freq: s.freq, q: s.q });
+    }
+    return out;
+  }
+
+  function createWetChain(sections, initialGain = state.wet, baseDelayMs = state.baseDelayMs) {
+    const ac = ensureAudioContext();
+    const chain = {
+      nodes: [],
+      gain: ac.createGain(),
+      entry: null,
+      fadingOut: false,
+      disconnected: false
+    };
+
+    chain.gain.gain.value = initialGain;
+
+    let current = inputGain;
+
+    if (baseDelayMs > 0.001) {
+      const delay = ac.createDelay(1.25);
+      delay.delayTime.setValueAtTime(clamp(baseDelayMs / 1000, 0, 1.0), ac.currentTime);
+      chain.entry = delay;
+      inputGain.connect(delay);
+      current = delay;
+      chain.nodes.push(delay);
+    }
+
+    const flatSections = flattenSections(sections);
+
+    for (const sec of flatSections) {
+      const node = ac.createBiquadFilter();
+      node.type = "allpass";
+      node.frequency.setValueAtTime(clamp(sec.freq, 10, ac.sampleRate * 0.45), ac.currentTime);
+      node.Q.setValueAtTime(clamp(sec.q, 0.0001, 1000), ac.currentTime);
+      if (!chain.entry) chain.entry = node;
+      current.connect(node);
+      current = node;
+      chain.nodes.push(node);
+    }
+
+    if (!chain.entry) {
+      chain.entry = chain.gain;
+      inputGain.connect(chain.gain);
+    } else {
+      current.connect(chain.gain);
+    }
+
+    chain.gain.connect(outputGain);
+    return chain;
+  }
+
+  function setupPlaybackGraph() {
+    const ac = ensureAudioContext();
+    if (!inputGain || !outputGain) return;
+
+    for (const chain of wetChains) disconnectWetChain(chain);
+    wetChains = [];
+
+    dryGain = ac.createGain();
+    dryGain.gain.value = 1.0 - state.wet;
+    inputGain.connect(dryGain);
+    dryGain.connect(outputGain);
+
+    const wetChain = createWetChain(state.sections, state.wet);
+    wetChains.push(wetChain);
+
+    updateReadouts();
+  }
+
+  function rebuildAudioGraph() {
+    if (!inputGain || !outputGain) return;
+
+    const ac = ensureAudioContext();
+    const now = ac.currentTime;
+    const fade = 0.055;
+
+    if (!dryGain) {
+      setupPlaybackGraph();
+      return;
+    }
+
+    smoothParam(dryGain.gain, 1.0 - state.wet, fade);
+
+    const oldChains = wetChains.slice();
+    const newChain = createWetChain(state.sections, 0.0);
+    wetChains.push(newChain);
+
+    newChain.gain.gain.cancelScheduledValues(now);
+    newChain.gain.gain.setValueAtTime(0.0, now);
+    newChain.gain.gain.linearRampToValueAtTime(state.wet, now + fade);
+
+    for (const chain of oldChains) {
+      chain.fadingOut = true;
+      try {
+        chain.gain.gain.cancelScheduledValues(now);
+        chain.gain.gain.setValueAtTime(chain.gain.gain.value, now);
+        chain.gain.gain.linearRampToValueAtTime(0.0, now + fade);
+      } catch (_) {
+        chain.gain.gain.value = 0.0;
+      }
+    }
+
+    setTimeout(() => {
+      for (const chain of oldChains) disconnectWetChain(chain);
+      wetChains = wetChains.filter(chain => !chain.disconnected);
+    }, Math.ceil((fade + 0.04) * 1000));
+
+    updateReadouts();
+  }
+
+  function scheduleAudioGraphRefresh() {
+    if (!isPlaying || !inputGain || !outputGain) return;
+    rebuildAudioGraph();
+  }
+
+  function createSource(offsetSec = 0) {
+    const ac = ensureAudioContext();
+    stopSourceOnly();
+
+    source = ac.createBufferSource();
+    source.buffer = audioBuffer;
+    source.loop = loopEl.checked;
+
+    inputGain = ac.createGain();
+    outputGain = ac.createGain();
+    outputGain.gain.value = 0.9;
+
+    source.connect(inputGain);
+    outputGain.connect(ac.destination);
+
+    setupPlaybackGraph();
+
+    source.onended = () => {
+      if (!source || loopEl.checked) return;
+      isPlaying = false;
+      pausedAt = 0;
+      playBtn.textContent = "Play";
+      cleanupPlaybackGraph();
+    };
+
+    startedAt = ac.currentTime - offsetSec;
+    source.start(0, offsetSec);
+  }
+
+  async function playPause() {
+    if (!audioBuffer) {
+      alert("先に音声ファイルまたはテスト音源を読み込んでください。");
+      return;
+    }
+    const ac = ensureAudioContext();
+    if (ac.state === "suspended") await ac.resume();
+
+    if (!isPlaying) {
+      createSource(pausedAt);
+      isPlaying = true;
+      playBtn.textContent = "Pause";
+      $("audioState").textContent = "Audio: playing";
+    } else {
+      pausedAt = (ac.currentTime - startedAt) % audioBuffer.duration;
+      stopSourceOnly();
+      cleanupPlaybackGraph();
+      isPlaying = false;
+      playBtn.textContent = "Play";
+      $("audioState").textContent = "Audio: paused";
+    }
+  }
+
+  function stopAll() {
+    stopSourceOnly();
+    cleanupPlaybackGraph();
+    isPlaying = false;
+    pausedAt = 0;
+    playBtn.textContent = "Play";
+    $("audioState").textContent = audioBuffer ? "Audio: stopped" : "Audio: no file";
+  }
+
+  function resizeCanvas() {
+    const dpr = window.devicePixelRatio || 1;
+    const rect = graph.getBoundingClientRect();
+    graph.width = Math.max(1, Math.round(rect.width * dpr));
+    graph.height = Math.max(1, Math.round(rect.height * dpr));
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    lastDrawSize = { w: rect.width, h: rect.height };
+  }
+
+  function niceMsStep() {
+    if (state.maxMs <= 100) return 20;
+    if (state.maxMs <= 250) return 50;
+    if (state.maxMs <= 500) return 100;
+    return 200;
+  }
+
+  function drawGrid(w, h, pad) {
+    g.clearRect(0, 0, w, h);
+    g.fillStyle = "#0e1118";
+    g.fillRect(0, 0, w, h);
+
+    const freqTicks = [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000];
+    const msTicks = [];
+    for (let v = 0; v <= state.maxMs + 0.0001; v += niceMsStep()) msTicks.push(v);
+
+    g.lineWidth = 1;
+    g.font = "11px ui-sans-serif, system-ui";
+    g.textBaseline = "middle";
+
+    for (const f of freqTicks) {
+      const x = freqToX(f, w, pad);
+      g.strokeStyle = f === 1000 ? "rgba(255,255,255,.22)" : "rgba(255,255,255,.10)";
+      g.beginPath();
+      g.moveTo(x, pad.t);
+      g.lineTo(x, h - pad.b);
+      g.stroke();
+
+      g.fillStyle = "rgba(238,242,255,.62)";
+      g.textAlign = "center";
+      g.fillText(fmtFreq(f), x, h - pad.b + 18);
+    }
+
+    for (const ms of msTicks) {
+      const y = msToY(ms, h, pad);
+      g.strokeStyle = ms === 0 ? "rgba(255,255,255,.25)" : "rgba(255,255,255,.10)";
+      g.beginPath();
+      g.moveTo(pad.l, y);
+      g.lineTo(w - pad.r, y);
+      g.stroke();
+
+      g.fillStyle = "rgba(238,242,255,.62)";
+      g.textAlign = "right";
+      g.fillText(ms.toFixed(0) + " ms", pad.l - 8, y);
+    }
+
+    g.strokeStyle = "rgba(255,255,255,.28)";
+    g.strokeRect(pad.l, pad.t, w - pad.l - pad.r, h - pad.t - pad.b);
+
+    g.fillStyle = "rgba(238,242,255,.85)";
+    g.textAlign = "center";
+    g.fillText("Frequency", (pad.l + w - pad.r) / 2, h - 12);
+
+    g.save();
+    g.translate(14, (pad.t + h - pad.b) / 2);
+    g.rotate(-Math.PI / 2);
+    g.fillText("Group delay / ms", 0, 0);
+    g.restore();
+  }
+
+  function drawCurve(w, h, pad, fn, color, lineWidth = 2) {
+    const n = 240;
+    g.beginPath();
+    for (let i = 0; i < n; i++) {
+      const t = i / (n - 1);
+      const freq = Math.pow(10, lerp(Math.log10(minFreq), Math.log10(maxFreq), t));
+      const x = freqToX(freq, w, pad);
+      const y = msToY(fn(freq), h, pad);
+      if (i === 0) g.moveTo(x, y);
+      else g.lineTo(x, y);
+    }
+    g.strokeStyle = color;
+    g.lineWidth = lineWidth;
+    g.lineJoin = "round";
+    g.lineCap = "round";
+    g.stroke();
+  }
+
+  function drawNodeInfluence(w, h, pad, node) {
+    if (!node.enabled) return;
+    const color = node.type === "scale" ? "rgba(154,247,195,.22)" : "rgba(125,211,252,.12)";
+    const n = 180;
+    g.beginPath();
+    for (let i = 0; i < n; i++) {
+      const t = i / (n - 1);
+      const f = Math.pow(10, lerp(Math.log10(minFreq), Math.log10(maxFreq), t));
+      const x = freqToX(f, w, pad);
+      const y = msToY(clamp(state.globalDelayMs + nodeValueAtFreq(node, f), 0, state.maxMs), h, pad);
+      if (i === 0) g.moveTo(x, y);
+      else g.lineTo(x, y);
+    }
+    g.lineTo(freqToX(maxFreq, w, pad), msToY(state.globalDelayMs, h, pad));
+    g.lineTo(freqToX(minFreq, w, pad), msToY(state.globalDelayMs, h, pad));
+    g.closePath();
+    g.fillStyle = color;
+    g.fill();
+  }
+
+  function nodeMarkerPosition(node, w, h, pad) {
+    const x = freqToX(node.freqHz, w, pad);
+    const y = msToY(clamp(state.globalDelayMs + node.amountMs, 0, state.maxMs), h, pad);
+    return { x, y };
+  }
+
+  function drawScalePeaks(w, h, pad, node) {
+    const freqs = scaleFrequencies(node);
+    g.strokeStyle = "rgba(154,247,195,.38)";
+    g.lineWidth = 1;
+    for (const f of freqs) {
+      if (f < minFreq || f > maxFreq) continue;
+      const x = freqToX(f, w, pad);
+      g.beginPath();
+      g.moveTo(x, pad.t);
+      g.lineTo(x, h - pad.b);
+      g.stroke();
+    }
+  }
+
+  function drawNodes(w, h, pad) {
+    for (const node of state.nodes) {
+      drawNodeInfluence(w, h, pad, node);
+      if (node.type === "scale") drawScalePeaks(w, h, pad, node);
+    }
+
+    for (const node of state.nodes) {
+      const selected = node.id === state.selectedNodeId;
+      const { x, y } = nodeMarkerPosition(node, w, h, pad);
+
+      const rangeL = clamp(node.freqHz / Math.pow(2, node.widthOct / 2), minFreq, maxFreq);
+      const rangeR = clamp(node.freqHz * Math.pow(2, node.widthOct / 2), minFreq, maxFreq);
+      const xl = freqToX(rangeL, w, pad);
+      const xr = freqToX(rangeR, w, pad);
+
+      if (selected) {
+        g.strokeStyle = "rgba(251,191,36,.8)";
+        g.lineWidth = 2;
+        g.beginPath();
+        g.moveTo(xl, y);
+        g.lineTo(xr, y);
+        g.stroke();
+
+        g.fillStyle = "#fbbf24";
+        g.fillRect(xl - 4, y - 12, 8, 24);
+        g.fillRect(xr - 4, y - 12, 8, 24);
+      }
+
+      g.beginPath();
+      g.arc(x, y, selected ? 9 : 7, 0, Math.PI * 2);
+      g.fillStyle = selected ? "#fbbf24" : (node.type === "scale" ? "#9af7c3" : "#7dd3fc");
+      g.fill();
+      g.lineWidth = 2;
+      g.strokeStyle = "rgba(255,255,255,.75)";
+      g.stroke();
+
+      g.fillStyle = "rgba(238,242,255,.86)";
+      g.font = "10px ui-sans-serif, system-ui";
+      g.textAlign = "center";
+      g.textBaseline = "bottom";
+      const label = node.type === "scale" ? `${noteNames[node.root]} penta` : fmtFreq(node.freqHz);
+      g.fillText(label, x, y - 12);
+    }
+  }
+
+  function draw() {
+    resizeCanvas();
+    const rect = graph.getBoundingClientRect();
+    const w = rect.width;
+    const h = rect.height;
+    const pad = { l: 64, r: 26, t: 24, b: 48 };
+
+    drawGrid(w, h, pad);
+
+    // Global pure delay line
+    const gy = msToY(state.globalDelayMs, h, pad);
+    g.strokeStyle = "rgba(134,239,172,.55)";
+    g.lineWidth = 1.5;
+    g.setLineDash([6, 6]);
+    g.beginPath();
+    g.moveTo(pad.l, gy);
+    g.lineTo(w - pad.r, gy);
+    g.stroke();
+    g.setLineDash([]);
+
+    drawNodes(w, h, pad);
+    drawCurve(w, h, pad, actualAtFreq, "rgba(240,171,252,.96)", 2.2);
+    drawCurve(w, h, pad, targetAtFreq, "rgba(125,211,252,.98)", 3.0);
+  }
+
+  function hitTestNode(evt) {
+    const rect = graph.getBoundingClientRect();
+    const x = evt.clientX - rect.left;
+    const y = evt.clientY - rect.top;
+    const pad = { l: 64, r: 26, t: 24, b: 48 };
+    const w = rect.width, h = rect.height;
+
+    const selected = selectedNode();
+    if (selected) {
+      const marker = nodeMarkerPosition(selected, w, h, pad);
+      const xl = freqToX(clamp(selected.freqHz / Math.pow(2, selected.widthOct / 2), minFreq, maxFreq), w, pad);
+      const xr = freqToX(clamp(selected.freqHz * Math.pow(2, selected.widthOct / 2), minFreq, maxFreq), w, pad);
+
+      if (Math.abs(x - xl) < 12 && Math.abs(y - marker.y) < 24) return { mode: "widthL", node: selected };
+      if (Math.abs(x - xr) < 12 && Math.abs(y - marker.y) < 24) return { mode: "widthR", node: selected };
+    }
+
+    let best = null;
+    let bestDist = Infinity;
+    for (const node of state.nodes) {
+      const p = nodeMarkerPosition(node, w, h, pad);
+      const d = Math.hypot(x - p.x, y - p.y);
+      if (d < bestDist) {
+        bestDist = d;
+        best = node;
+      }
+    }
+
+    if (best && bestDist < 24) return { mode: "move", node: best };
+
+    // Empty area: create/move selected nearest point.
+    return { mode: "moveEmpty", node: selected };
+  }
+
+  function applyPointerDrag(evt) {
+    if (!state.drag || !state.drag.node) return;
+
+    const rect = graph.getBoundingClientRect();
+    const x = evt.clientX - rect.left;
+    const y = evt.clientY - rect.top;
+    const pad = { l: 64, r: 26, t: 24, b: 48 };
+    const w = rect.width, h = rect.height;
+    const node = state.drag.node;
+
+    if (state.drag.mode === "move" || state.drag.mode === "moveEmpty") {
+      node.freqHz = clamp(xToFreq(x, w, pad), minFreq, maxFreq);
+      node.amountMs = clamp(yToMs(y, h, pad) - state.globalDelayMs, 0, state.maxMs);
+      if (node.type === "scale") {
+        // 横移動時はroot anchorとしてfreqHzだけ動く。実音階rootはUIで選ぶ。
+        // ただし候補中心にanchorが入るため、スケール全体の補助中心として働く。
+      }
+    } else if (state.drag.mode === "widthL" || state.drag.mode === "widthR") {
+      const f = clamp(xToFreq(x, w, pad), minFreq, maxFreq);
+      const oct = Math.abs(log2(f / node.freqHz)) * 2;
+      node.widthOct = clamp(oct, node.type === "scale" ? 0.01 : 0.03, node.type === "scale" ? 0.6 : 6.0);
+    }
+
+    syncSelectedControls();
+    renderNodeList();
+    scheduleRebuild(90);
+  }
+
+  graph.addEventListener("pointerdown", (evt) => {
+    const hit = hitTestNode(evt);
+    if (hit.node) {
+      selectNode(hit.node.id);
+      state.drag = { mode: hit.mode === "moveEmpty" ? "move" : hit.mode, node: hit.node };
+      graph.setPointerCapture(evt.pointerId);
+      applyPointerDrag(evt);
+    } else {
+      const rect = graph.getBoundingClientRect();
+      const x = evt.clientX - rect.left;
+      const y = evt.clientY - rect.top;
+      const pad = { l: 64, r: 26, t: 24, b: 48 };
+      const node = addNode("bell", {
+        freqHz: xToFreq(x, rect.width, pad),
+        amountMs: clamp(yToMs(y, rect.height, pad) - state.globalDelayMs, 0, state.maxMs),
+        widthOct: 1.0
+      });
+      state.drag = { mode: "move", node };
+      graph.setPointerCapture(evt.pointerId);
+    }
+  });
+
+  graph.addEventListener("pointermove", (evt) => {
+    if (!state.drag) return;
+    applyPointerDrag(evt);
+  });
+
+  graph.addEventListener("pointerup", (evt) => {
+    state.drag = null;
+    try { graph.releasePointerCapture(evt.pointerId); } catch (_) {}
+    scheduleRebuild(20);
+  });
+
+  graph.addEventListener("pointercancel", () => {
+    state.drag = null;
+    scheduleRebuild(20);
+  });
+
+  graph.addEventListener("wheel", (evt) => {
+    const node = selectedNode();
+    if (!node) return;
+    evt.preventDefault();
+    const factor = evt.deltaY > 0 ? 1.08 : 0.925;
+    node.widthOct = clamp(node.widthOct * factor, node.type === "scale" ? 0.01 : 0.03, node.type === "scale" ? 0.6 : 6.0);
+    syncSelectedControls();
+    renderNodeList();
+    scheduleRebuild(60);
+  }, { passive: false });
+
+  function renderNodeList() {
+    nodeListEl.innerHTML = "";
+    if (!state.nodes.length) {
+      const empty = document.createElement("div");
+      empty.className = "node-item";
+      empty.innerHTML = "<span>No nodes</span><small>click graph to add</small>";
+      nodeListEl.appendChild(empty);
+      return;
+    }
+
+    for (const node of state.nodes) {
+      const div = document.createElement("div");
+      div.className = "node-item" + (node.id === state.selectedNodeId ? " active" : "");
+      div.innerHTML = `<span>${node.name}</span><small>${fmtNode(node)}</small>`;
+      div.addEventListener("click", () => selectNode(node.id));
+      nodeListEl.appendChild(div);
+    }
+  }
+
+  function syncSelectedControls() {
+    const node = selectedNode();
+    const disabled = !node;
+    [nodeTypeEl, nodeFreqEl, nodeAmountEl, nodeWidthEl, scaleRootEl, scaleModeEl].forEach(el => el.disabled = disabled);
+    $("removeNode").disabled = disabled;
+    $("duplicateNode").disabled = disabled;
+
+    if (!node) {
+      $("selectedHint").textContent = "Selected: none";
+      return;
+    }
+
+    nodeTypeEl.value = node.type;
+    nodeFreqEl.value = node.freqHz.toFixed(2);
+    nodeAmountEl.value = String(Math.round(node.amountMs));
+    nodeWidthEl.value = String(node.widthOct);
+    scaleRootEl.value = String(node.root);
+    scaleModeEl.value = node.mode;
+
+    $("nodeAmountVal").textContent = Math.round(node.amountMs) + " ms";
+    $("nodeWidthVal").textContent = node.widthOct.toFixed(2) + " oct";
+    $("selectedHint").textContent = "Selected: " + fmtNode(node);
+  }
+
+  function updateSelectedFromControls() {
+    const node = selectedNode();
+    if (!node) return;
+
+    const newType = nodeTypeEl.value;
+    node.type = newType;
+    node.name =
+      newType === "scale" ? "Pentatonic" :
+      newType === "lowShelf" ? "Low Shelf" :
+      newType === "highShelf" ? "High Shelf" : "Bell";
+
+    node.freqHz = clamp(parseFloat(nodeFreqEl.value) || 1000, minFreq, maxFreq);
+    node.amountMs = clamp(parseFloat(nodeAmountEl.value) || 0, 0, 1000);
+    node.widthOct = clamp(parseFloat(nodeWidthEl.value) || 1.0, newType === "scale" ? 0.01 : 0.03, newType === "scale" ? 0.6 : 6.0);
+    node.root = parseInt(scaleRootEl.value, 10);
+    node.mode = scaleModeEl.value;
+
+    syncSelectedControls();
+    renderNodeList();
+    scheduleRebuild();
+  }
+
+  function updateReadouts() {
+    const total = state.sections.reduce((a, s) => a + s.count, 0);
+    $("sectionCount").textContent = "All-pass sections: " + total;
+    $("baseDelayHint").textContent = "Pure delay: " + (state.baseDelayMs || 0).toFixed(1) + " ms";
+    $("fitHint").textContent = "Fit RMS error: " + (state.fitErrorMs || 0).toFixed(1) + " ms";
+    $("globalDelayVal").textContent = Math.round(state.globalDelayMs) + " ms";
+    $("maxMsVal").textContent = Math.round(state.maxMs) + " ms";
+    $("wetVal").textContent = Math.round(state.wet * 100) + "%";
+    $("maxSectionsVal").textContent = String(state.maxSections);
+    if (selectedNode()) $("selectedHint").textContent = "Selected: " + fmtNode(selectedNode());
+
+    if (dryGain) smoothParam(dryGain.gain, 1.0 - state.wet, 0.025);
+    for (const chain of wetChains) {
+      if (!chain.fadingOut) smoothParam(chain.gain.gain, state.wet, 0.025);
+    }
+  }
+
+  function patchObject() {
+    return {
+      name: "Graphic Group Delay EQ v5 Patch",
+      version: 5,
+      globalDelayMs: +state.globalDelayMs.toFixed(3),
+      maxMs: state.maxMs,
+      wet: +state.wet.toFixed(4),
+      maxSections: state.maxSections,
+      nodes: state.nodes.map(n => ({
+        type: n.type,
+        name: n.name,
+        freqHz: +n.freqHz.toFixed(4),
+        amountMs: +n.amountMs.toFixed(3),
+        widthOct: +n.widthOct.toFixed(4),
+        root: n.root,
+        mode: n.mode,
+        enabled: n.enabled
+      })),
+      engine: "v5-modern-node-residual-greedy-allpass",
+      pureDelayMs: +(state.baseDelayMs || 0).toFixed(3),
+      fitErrorMs: +(state.fitErrorMs || 0).toFixed(3)
+    };
+  }
+
+  function updatePatchText() {
+    patchEl.value = JSON.stringify(patchObject(), null, 2);
+  }
+
+  function loadPatchFromText() {
+    try {
+      const p = JSON.parse(patchEl.value);
+      state.globalDelayMs = clamp(Number(p.globalDelayMs ?? 0), 0, 1000);
+      state.maxMs = clamp(Math.round(Number(p.maxMs ?? 1000)), 50, 1000);
+      state.wet = clamp(Number(p.wet ?? 1), 0, 1);
+      state.maxSections = clamp(Math.round(Number(p.maxSections ?? 1024)), 8, 4096);
+      state.nodes = [];
+      state.nextNodeId = 1;
+
+      if (Array.isArray(p.nodes)) {
+        for (const n of p.nodes) {
+          state.nodes.push(makeNode(n.type || "bell", {
+            name: n.name,
+            freqHz: clamp(Number(n.freqHz ?? 1000), minFreq, maxFreq),
+            amountMs: clamp(Number(n.amountMs ?? 0), 0, 1000),
+            widthOct: clamp(Number(n.widthOct ?? 1), 0.01, 6),
+            root: clamp(Math.round(Number(n.root ?? 9)), 0, 11),
+            mode: n.mode || "minorPentatonic",
+            enabled: n.enabled !== false
+          }));
+        }
+      }
+
+      state.selectedNodeId = state.nodes.length ? state.nodes[0].id : null;
+
+      globalDelayEl.value = String(Math.round(state.globalDelayMs));
+      maxMsEl.value = String(state.maxMs);
+      wetEl.value = String(Math.round(state.wet * 100));
+      maxSectionsEl.value = String(state.maxSections);
+
+      syncSelectedControls();
+      renderNodeList();
+      buildPatch();
+    } catch (e) {
+      alert("Patch JSONを読み込めません: " + e.message);
+    }
+  }
+
+  function setPreset(name) {
+    stopAll();
+    state.nodes = [];
+    state.nextNodeId = 1;
+    state.globalDelayMs = 0;
+    state.maxMs = 1000;
+    state.wet = 1.0;
+    state.maxSections = 1024;
+
+    if (name === "flat") {
+      // keep empty
+    } else if (name === "global") {
+      state.globalDelayMs = 650;
+    } else if (name === "disperser") {
+      addNode("bell", { name: "Disperser Mid", freqHz: 900, amountMs: 520, widthOct: 1.2 });
+      addNode("bell", { name: "Snap Peak", freqHz: 2400, amountMs: 180, widthOct: 0.55 });
+      state.selectedNodeId = state.nodes[0].id;
+    } else if (name === "vocal") {
+      addNode("highShelf", { name: "Air Lag", freqHz: 5200, amountMs: 240, widthOct: 1.1 });
+      addNode("bell", { name: "Presence Bloom", freqHz: 1700, amountMs: 160, widthOct: 0.8 });
+      state.selectedNodeId = state.nodes[0].id;
+    } else if (name === "pentatonic") {
+      addNode("scale", { name: "A Minor Pentatonic", freqHz: 440, amountMs: 430, widthOct: 0.055, root: 9, mode: "minorPentatonic" });
+      state.globalDelayMs = 60;
+      state.maxSections = 1536;
+      state.selectedNodeId = state.nodes[0].id;
+    } else if (name === "bass") {
+      addNode("lowShelf", { name: "Bass Push", freqHz: 180, amountMs: 420, widthOct: 1.3 });
+      addNode("bell", { name: "Kick Bloom", freqHz: 65, amountMs: 260, widthOct: 0.55 });
+      state.selectedNodeId = state.nodes[0].id;
+    }
+
+    globalDelayEl.value = String(Math.round(state.globalDelayMs));
+    maxMsEl.value = String(state.maxMs);
+    wetEl.value = String(Math.round(state.wet * 100));
+    maxSectionsEl.value = String(state.maxSections);
+    syncSelectedControls();
+    renderNodeList();
+    buildPatch();
+  }
+
+  fileEl.addEventListener("change", async () => {
+    if (!fileEl.files || !fileEl.files[0]) return;
+    try {
+      await loadFile(fileEl.files[0]);
+    } catch (e) {
+      console.error(e);
+      alert("音声ファイルを読み込めませんでした: " + e.message);
+    }
+  });
+
+  loadTestBtn.addEventListener("click", () => loadTestSource(testSourceEl.value));
+  playBtn.addEventListener("click", playPause);
+  stopBtn.addEventListener("click", stopAll);
+  rebuildBtn.addEventListener("click", buildPatch);
+
+  globalDelayEl.addEventListener("input", () => {
+    state.globalDelayMs = clamp(parseFloat(globalDelayEl.value), 0, 1000);
+    scheduleRebuild(50);
+  });
+
+  maxMsEl.addEventListener("input", () => {
+    state.maxMs = clamp(parseFloat(maxMsEl.value), 50, 1000);
+    for (const n of state.nodes) n.amountMs = clamp(n.amountMs, 0, state.maxMs);
+    state.globalDelayMs = clamp(state.globalDelayMs, 0, state.maxMs);
+    globalDelayEl.value = String(Math.round(state.globalDelayMs));
+    syncSelectedControls();
+    scheduleRebuild(50);
+  });
+
+  wetEl.addEventListener("input", () => {
+    state.wet = parseInt(wetEl.value, 10) / 100;
+    updateReadouts();
+    updatePatchText();
+  });
+
+  maxSectionsEl.addEventListener("input", () => {
+    state.maxSections = parseInt(maxSectionsEl.value, 10);
+    scheduleRebuild(80);
+  });
+
+  $("addBell").addEventListener("click", () => addNode("bell", { freqHz: 1000, amountMs: 250, widthOct: 1.0 }));
+  $("addLowShelf").addEventListener("click", () => addNode("lowShelf", { freqHz: 250, amountMs: 300, widthOct: 1.2 }));
+  $("addHighShelf").addEventListener("click", () => addNode("highShelf", { freqHz: 5000, amountMs: 250, widthOct: 1.1 }));
+  $("addScale").addEventListener("click", () => addNode("scale", { freqHz: 440, amountMs: 350, widthOct: 0.06, root: 9, mode: "minorPentatonic" }));
+
+  $("removeNode").addEventListener("click", removeSelectedNode);
+  $("duplicateNode").addEventListener("click", duplicateSelectedNode);
+
+  [nodeTypeEl, nodeFreqEl, nodeAmountEl, nodeWidthEl, scaleRootEl, scaleModeEl].forEach(el => {
+    el.addEventListener("input", updateSelectedFromControls);
+    el.addEventListener("change", updateSelectedFromControls);
+  });
+
+  document.querySelectorAll("[data-preset]").forEach(btn => {
+    btn.addEventListener("click", () => setPreset(btn.dataset.preset));
+  });
+
+  $("copyPatch").addEventListener("click", async () => {
+    updatePatchText();
+    try {
+      await navigator.clipboard.writeText(patchEl.value);
+    } catch (_) {
+      patchEl.select();
+      document.execCommand("copy");
+    }
+  });
+
+  $("loadPatch").addEventListener("click", loadPatchFromText);
+  window.addEventListener("resize", draw);
+
+  // Initial patch
+  addNode("bell", { name: "Bell Delay", freqHz: 900, amountMs: 260, widthOct: 1.0 });
+  addNode("scale", { name: "A Minor Pentatonic", freqHz: 440, amountMs: 180, widthOct: 0.055, root: 9, mode: "minorPentatonic" });
+  state.selectedNodeId = state.nodes[0].id;
+  syncSelectedControls();
+  renderNodeList();
+  buildPatch();
+})();
+</script>
+</body>
+</html>
