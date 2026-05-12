@@ -504,4 +504,52 @@ mod tests {
             assert!((back / freq - 1.0).abs() < 0.001);
         }
     }
+
+    #[test]
+    fn ms_mapping_round_trips() {
+        let rect = Rect::from_min_max(pos2(10.0, 20.0), pos2(410.0, 820.0));
+        for ms in [0.0, 12.5, 100.0, 500.0, 1000.0] {
+            let y = ms_to_y(ms, rect, 1000.0);
+            let back = y_to_ms(y, rect, 1000.0);
+            assert!((back - ms).abs() < 0.001, "ms={ms} back={back}");
+        }
+    }
+
+    #[test]
+    fn coordinate_mapping_clamps_to_graph_bounds() {
+        let rect = Rect::from_min_max(pos2(0.0, 0.0), pos2(1000.0, 400.0));
+        assert!((x_to_freq(-100.0, rect) - MIN_FREQ_HZ).abs() < 1e-4);
+        assert!((x_to_freq(1100.0, rect) - MAX_FREQ_HZ).abs() < 0.01);
+        assert!((y_to_ms(500.0, rect, 1000.0) - 0.0).abs() < 1e-6);
+        assert!((y_to_ms(-100.0, rect, 1000.0) - 1000.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn hit_test_ignores_disabled_nodes_and_picks_nearest() {
+        let rect = Rect::from_min_max(pos2(0.0, 0.0), pos2(1000.0, 400.0));
+        let mut snapshot = RuntimeSnapshot::default();
+        snapshot.nodes[0] = NodeRuntimeParams {
+            enabled: false,
+            freq_hz: 1000.0,
+            amount_ms: 300.0,
+            ..NodeRuntimeParams::default()
+        };
+        snapshot.nodes[1] = NodeRuntimeParams {
+            enabled: true,
+            freq_hz: 1000.0,
+            amount_ms: 300.0,
+            ..NodeRuntimeParams::default()
+        };
+
+        let pos = pos2(freq_to_x(1000.0, rect), ms_to_y(300.0, rect, 1000.0));
+        assert_eq!(hit_test(pos, rect, &snapshot, 1000.0), Some(1));
+    }
+
+    #[test]
+    fn width_range_is_narrower_for_scale_nodes() {
+        assert_eq!(width_range(NodeType::Scale), (0.01, 0.6));
+        assert_eq!(width_range(NodeType::Bell), (0.03, 6.0));
+        assert_eq!(width_range(NodeType::LowShelf), (0.03, 6.0));
+        assert_eq!(width_range(NodeType::HighShelf), (0.03, 6.0));
+    }
 }

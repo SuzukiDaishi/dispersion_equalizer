@@ -33,4 +33,6 @@ cargo check
 cargo test
 ```
 
+Release instructions are documented in `docs/release.md`.
+
 The MVP packaging target is CLAP. VST3 export is kept buildable, but distribution policy should be reviewed before publishing VST3 builds because of the VST3 binding license considerations documented in `docs/pre_spec.md` and `plan.md`.
