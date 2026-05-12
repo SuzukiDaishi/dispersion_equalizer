@@ -1,0 +1,104 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-x64
+            os: windows-latest
+          - platform: linux-x64
+            os: ubuntu-latest
+          - platform: macos-arm64
+            os: macos-latest
+          - platform: macos-x64
+            os: macos-15-intel
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            pkg-config \
+            libasound2-dev \
+            libjack-jackd2-dev \
+            libx11-dev \
+            libxcb1-dev \
+            libxkbcommon-dev \
+            libgl1-mesa-dev
+
+      - name: Run tests
+        run: cargo test
+
+      - name: Bundle plugin
+        run: cargo xtask bundle dispersion_equalizer --release
+
+      - name: Create release zip
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $tag = "${{ github.ref_name }}"
+          $bundleDir = Join-Path $PWD "target/bundled"
+          $stage = Join-Path $PWD "target/package/${{ matrix.platform }}"
+          $zipPath = Join-Path $PWD "target/package/Dispersion.Equalizer-$tag-${{ matrix.platform }}.zip"
+
+          if (Test-Path $stage) { Remove-Item -LiteralPath $stage -Recurse -Force }
+          New-Item -ItemType Directory -Path $stage -Force | Out-Null
+          New-Item -ItemType Directory -Path (Split-Path $zipPath) -Force | Out-Null
+
+          Copy-Item -LiteralPath (Join-Path $bundleDir "Dispersion Equalizer.vst3") -Destination (Join-Path $stage "Dispersion Equalizer.vst3") -Recurse -Force
+          Copy-Item -LiteralPath (Join-Path $bundleDir "Dispersion Equalizer.clap") -Destination (Join-Path $stage "Dispersion Equalizer.clap") -Recurse -Force
+
+          if (Test-Path $zipPath) { Remove-Item -LiteralPath $zipPath -Force }
+          Compress-Archive -LiteralPath `
+            (Join-Path $stage "Dispersion Equalizer.vst3"), `
+            (Join-Path $stage "Dispersion Equalizer.clap") `
+            -DestinationPath $zipPath `
+            -CompressionLevel Optimal
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Dispersion.Equalizer-${{ github.ref_name }}-${{ matrix.platform }}
+          path: target/package/Dispersion.Equalizer-${{ github.ref_name }}-${{ matrix.platform }}.zip
+          retention-days: 7
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" dist/*.zip \
+            --title "Dispersion Equalizer $TAG" \
+            --generate-notes \
+            --verify-tag
