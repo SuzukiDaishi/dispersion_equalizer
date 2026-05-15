@@ -13,9 +13,7 @@ pub fn create(params: Arc<PluginParams>) -> Option<Box<dyn Editor>> {
             gui::theme::apply(ctx);
         },
         move |ctx: &egui::Context, setter: &ParamSetter, _state| {
-            egui::CentralPanel::default().show(ctx, |ui| {
-                gui::draw_editor(ui, ctx, setter, &params);
-            });
+            gui::draw_editor(ctx, setter, &params);
         },
     )
 }

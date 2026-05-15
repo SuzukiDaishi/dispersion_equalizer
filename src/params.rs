@@ -59,7 +59,7 @@ pub struct NodeParams {
 impl Default for PluginParams {
     fn default() -> Self {
         Self {
-            editor_state: EguiState::from_size(1020, 680),
+            editor_state: EguiState::from_size(1024, 680),
             preset_state: Arc::new(Mutex::new(PresetState::default())),
             global_delay_ms: FloatParam::new(
                 "Global Delay",
