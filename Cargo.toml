@@ -1,6 +1,6 @@
 [package]
 name = "dispersion_equalizer"
-version = "0.1.3"
+version = "0.1.4"
 edition = "2021"
 authors = ["zukky <zukky.rikugame@gmail.com>"]
 license = "ISC"
