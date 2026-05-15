@@ -11,47 +11,76 @@ use nih_plug::prelude::{Param, ParamSetter};
 use nih_plug_egui::{egui, widgets};
 
 pub fn draw_editor(
-    _ui: &mut egui::Ui,
     ctx: &egui::Context,
     setter: &ParamSetter,
     params: &PluginParams,
 ) {
     let sample_rate = 48_000.0;
-    let snapshot = params.runtime_snapshot();
-    let graph_max_ms = preset_state(params).graph_max_ms;
-    let preview = compile_preview(&snapshot, sample_rate, graph_max_ms);
+    let mut graph_max_ms = preset_state(params).graph_max_ms;
+    let mut snapshot = params.runtime_snapshot();
+    let mut preview = compile_preview(&snapshot, sample_rate, graph_max_ms);
 
-    egui::TopBottomPanel::top("top-bar").show(ctx, |ui| {
-        ui.horizontal(|ui| {
-            ui.heading("Dispersion Equalizer");
-            ui.separator();
-            if ui.button("Flat").clicked() {
-                apply_preset(setter, params, BuiltinPreset::Flat);
-            }
-            if ui.button("Big Global").clicked() {
-                apply_preset(setter, params, BuiltinPreset::BigGlobal);
-            }
-            if ui.button("Spread").clicked() {
-                apply_preset(setter, params, BuiltinPreset::PhaseSpread);
-            }
-            if ui.button("Vocal Air").clicked() {
-                apply_preset(setter, params, BuiltinPreset::VocalAir);
-            }
-            if ui.button("A minor Penta").clicked() {
-                apply_preset(setter, params, BuiltinPreset::AMinorPenta);
-            }
-            if ui.button("Bass Push").clicked() {
-                apply_preset(setter, params, BuiltinPreset::BassPush);
-            }
+    // Helper: refresh snapshot/preview after any state mutation so downstream
+    // panels see the updated state in the same frame.
+    macro_rules! refresh {
+        () => {{
+            graph_max_ms = preset_state(params).graph_max_ms;
+            snapshot = params.runtime_snapshot();
+            preview = compile_preview(&snapshot, sample_rate, graph_max_ms);
+            ctx.request_repaint();
+        }};
+    }
+
+    let preset_changed = {
+        let mut changed = false;
+        egui::TopBottomPanel::top("top-bar").show(ctx, |ui| {
+            ui.horizontal(|ui| {
+                ui.heading("Dispersion Equalizer");
+                ui.separator();
+                if ui.button("Flat").clicked() {
+                    apply_preset(setter, params, BuiltinPreset::Flat);
+                    changed = true;
+                }
+                if ui.button("Big Global").clicked() {
+                    apply_preset(setter, params, BuiltinPreset::BigGlobal);
+                    changed = true;
+                }
+                if ui.button("Spread").clicked() {
+                    apply_preset(setter, params, BuiltinPreset::PhaseSpread);
+                    changed = true;
+                }
+                if ui.button("Vocal Air").clicked() {
+                    apply_preset(setter, params, BuiltinPreset::VocalAir);
+                    changed = true;
+                }
+                if ui.button("A minor Penta").clicked() {
+                    apply_preset(setter, params, BuiltinPreset::AMinorPenta);
+                    changed = true;
+                }
+                if ui.button("Bass Push").clicked() {
+                    apply_preset(setter, params, BuiltinPreset::BassPush);
+                    changed = true;
+                }
+            });
         });
-    });
+        changed
+    };
 
-    egui::SidePanel::right("inspector")
+    // Refresh before Inspector so it sees the preset change in the same frame.
+    if preset_changed {
+        refresh!();
+    }
+
+    let inspector_changed = egui::SidePanel::right("inspector")
         .resizable(false)
         .default_width(290.0)
-        .show(ctx, |ui| {
-            inspector::draw(ui, setter, params, &snapshot, &preview);
-        });
+        .show(ctx, |ui| inspector::draw(ui, setter, params, &snapshot, &preview))
+        .inner;
+
+    // Refresh before Graph so it sees the inspector change in the same frame.
+    if inspector_changed {
+        refresh!();
+    }
 
     egui::TopBottomPanel::bottom("bottom-bar").show(ctx, |ui| {
         ui.horizontal(|ui| {
@@ -78,6 +107,9 @@ pub fn draw_editor(
 
     egui::CentralPanel::default().show(ctx, |ui| {
         let action = graph::draw(ui, ctx, setter, params, &snapshot, &preview, graph_max_ms);
+        if !matches!(action, GraphAction::None) {
+            ctx.request_repaint();
+        }
         handle_graph_action(setter, params, action);
     });
 }

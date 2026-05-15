@@ -7,13 +7,16 @@ use crate::params::PluginParams;
 use nih_plug::prelude::ParamSetter;
 use nih_plug_egui::{egui, widgets};
 
+/// Returns `true` if any state changed this frame (triggers snapshot refresh + repaint).
 pub fn draw(
     ui: &mut egui::Ui,
     setter: &ParamSetter,
     params: &PluginParams,
     snapshot: &RuntimeSnapshot,
     preview: &PreviewCurve,
-) {
+) -> bool {
+    let mut changed = false;
+
     ui.label(egui::RichText::new("Inspector").size(16.0).strong());
     ui.separator();
     ui.label(format!("Sections: {}", preview.section_count));
@@ -22,30 +25,50 @@ pub fn draw(
     ui.add_space(4.0);
 
     // ── Add node buttons ──────────────────────────────────────────────────────
+    let has_free = first_free_slot(params).is_some();
     ui.horizontal_wrapped(|ui| {
-        if ui.button("+ Bell").clicked() {
+        if ui
+            .add_enabled(has_free, egui::Button::new("+ Bell"))
+            .clicked()
+        {
             if let Some(slot) = first_free_slot(params) {
                 configure_node(setter, params, slot, NodeType::Bell, 1000.0, 250.0, 1.0);
                 update_preset_state(params, |state| state.selected_slot = Some(slot));
+                changed = true;
             }
         }
-        if ui.button("+ Low Shelf").clicked() {
+        if ui
+            .add_enabled(has_free, egui::Button::new("+ Low Shelf"))
+            .clicked()
+        {
             if let Some(slot) = first_free_slot(params) {
                 configure_node(setter, params, slot, NodeType::LowShelf, 250.0, 300.0, 1.2);
                 update_preset_state(params, |state| state.selected_slot = Some(slot));
+                changed = true;
             }
         }
-        if ui.button("+ High Shelf").clicked() {
+        if ui
+            .add_enabled(has_free, egui::Button::new("+ High Shelf"))
+            .clicked()
+        {
             if let Some(slot) = first_free_slot(params) {
                 configure_node(setter, params, slot, NodeType::HighShelf, 5000.0, 250.0, 1.1);
                 update_preset_state(params, |state| state.selected_slot = Some(slot));
+                changed = true;
             }
         }
-        if ui.button("+ Pentatonic").clicked() {
+        if ui
+            .add_enabled(has_free, egui::Button::new("+ Pentatonic"))
+            .clicked()
+        {
             if let Some(slot) = first_free_slot(params) {
                 configure_node(setter, params, slot, NodeType::Scale, 440.0, 350.0, 0.055);
                 update_preset_state(params, |state| state.selected_slot = Some(slot));
+                changed = true;
             }
+        }
+        if !has_free {
+            ui.label(egui::RichText::new("(all 16 slots in use)").weak());
         }
     });
 
@@ -79,6 +102,7 @@ pub fn draw(
                 };
                 if ui.selectable_label(selected, label).clicked() {
                     update_preset_state(params, |state| state.selected_slot = Some(slot));
+                    changed = true;
                 }
             }
         });
@@ -87,24 +111,28 @@ pub fn draw(
     ui.separator();
     let Some(slot) = selected_slot(params) else {
         ui.label("No node selected");
-        return;
+        return changed;
     };
     let node_params = &params.nodes[slot];
     let node = snapshot.nodes[slot];
 
     ui.label(egui::RichText::new(format!("Node {:02}", slot + 1)).size(14.0).strong());
-    ui.add(widgets::ParamSlider::for_param(&node_params.enabled, setter));
-    ui.add(widgets::ParamSlider::for_param(&node_params.node_type, setter));
-    ui.add(widgets::ParamSlider::for_param(&node_params.freq_hz, setter));
-    ui.add(widgets::ParamSlider::for_param(&node_params.amount_ms, setter));
-    ui.add(widgets::ParamSlider::for_param(&node_params.width_oct, setter));
+    changed |= ui.add(widgets::ParamSlider::for_param(&node_params.enabled, setter)).changed();
+    changed |= ui.add(widgets::ParamSlider::for_param(&node_params.node_type, setter)).changed();
+    changed |= ui.add(widgets::ParamSlider::for_param(&node_params.freq_hz, setter)).changed();
+    changed |= ui.add(widgets::ParamSlider::for_param(&node_params.amount_ms, setter)).changed();
+    changed |= ui.add(widgets::ParamSlider::for_param(&node_params.width_oct, setter)).changed();
 
     // Scale-specific controls
     if node.node_type == NodeType::Scale {
         ui.separator();
         ui.label("Scale");
-        ui.add(widgets::ParamSlider::for_param(&node_params.scale_root, setter));
-        ui.add(widgets::ParamSlider::for_param(&node_params.scale_mode, setter));
+        changed |= ui
+            .add(widgets::ParamSlider::for_param(&node_params.scale_root, setter))
+            .changed();
+        changed |= ui
+            .add(widgets::ParamSlider::for_param(&node_params.scale_mode, setter))
+            .changed();
     }
 
     ui.horizontal(|ui| {
@@ -113,6 +141,7 @@ pub fn draw(
             update_preset_state(params, |state| {
                 state.selected_slot = params.nodes.iter().position(|node| node.enabled.value());
             });
+            changed = true;
         }
     });
 
@@ -125,5 +154,8 @@ pub fn draw(
         .changed()
     {
         update_preset_state(params, |state| state.graph_max_ms = graph_max);
+        changed = true;
     }
+
+    changed
 }
