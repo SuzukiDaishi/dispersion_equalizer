@@ -18,10 +18,8 @@ jobs:
             os: windows-latest
           - platform: linux-x64
             os: ubuntu-latest
-          - platform: macos-arm64
+          - platform: macos-universal
             os: macos-latest
-          - platform: macos-x64
-            os: macos-15-intel
 
     steps:
       - name: Checkout
@@ -44,13 +42,98 @@ jobs:
             libxkbcommon-dev \
             libgl1-mesa-dev
 
+      - name: Add macOS cross-compile target
+        if: runner.os == 'macOS'
+        run: rustup target add x86_64-apple-darwin
+
       - name: Run tests
         run: cargo test
+
+      # ── macOS: arm64 bundle (native) ──────────────────────────────────────────
 
       - name: Bundle plugin
         run: cargo xtask bundle dispersion_equalizer --release
 
-      - name: Create platform zip
+      # ── macOS: cross-compile x86_64 binary and merge into Universal ──────────
+
+      - name: Cross-compile library for x86_64 (macOS)
+        if: runner.os == 'macOS'
+        run: cargo build --lib --release --target x86_64-apple-darwin
+
+      - name: Create Universal macOS bundles
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          X64_LIB="target/x86_64-apple-darwin/release/libdispersion_equalizer.dylib"
+          mkdir -p "target/universal"
+
+          for PLUGIN_NAME in "Dispersion Equalizer.vst3" "Dispersion Equalizer.clap"; do
+            ARM_BUNDLE="target/bundled/$PLUGIN_NAME"
+            UNI_BUNDLE="target/universal/$PLUGIN_NAME"
+            cp -R "$ARM_BUNDLE" "$UNI_BUNDLE"
+
+            ARM_BIN=$(find "$ARM_BUNDLE/Contents/MacOS" -maxdepth 1 -type f | head -n1)
+            if [ -z "$ARM_BIN" ]; then
+              echo "::error::No binary found in $ARM_BUNDLE/Contents/MacOS"
+              exit 1
+            fi
+            OUT_BIN="$UNI_BUNDLE/Contents/MacOS/$(basename "$ARM_BIN")"
+
+            lipo -create "$ARM_BIN" "$X64_LIB" -output "$OUT_BIN"
+            echo "$PLUGIN_NAME: $(lipo -archs "$OUT_BIN")"
+          done
+
+          cp -Rf "target/universal/Dispersion Equalizer.vst3" "target/bundled/"
+          cp -Rf "target/universal/Dispersion Equalizer.clap" "target/bundled/"
+
+      # ── macOS: sign with Developer ID ────────────────────────────────────────
+
+      - name: Sign macOS bundles
+        if: runner.os == 'macOS'
+        env:
+          APPLE_IDENTITY: ${{ secrets.APPLE_IDENTITY }}
+        shell: bash
+        run: |
+          if [ -z "$APPLE_IDENTITY" ]; then
+            echo "::error::APPLE_IDENTITY secret is not set."
+            echo "::error::Add 'Developer ID Application: Your Name (TEAMID)' as a repository secret."
+            exit 1
+          fi
+          sign_bundle() {
+            local BUNDLE="$1"
+            local BIN
+            BIN=$(find "$BUNDLE/Contents/MacOS" -maxdepth 1 -type f | head -n1)
+            if [ -z "$BIN" ]; then
+              echo "::error::No binary found in $BUNDLE/Contents/MacOS"
+              exit 1
+            fi
+            codesign --force --timestamp --options runtime \
+              --sign "$APPLE_IDENTITY" "$BIN"
+            codesign --force --timestamp \
+              --sign "$APPLE_IDENTITY" "$BUNDLE"
+          }
+          sign_bundle "target/bundled/Dispersion Equalizer.vst3"
+          sign_bundle "target/bundled/Dispersion Equalizer.clap"
+
+      # ── macOS: package as DMG ─────────────────────────────────────────────────
+
+      - name: Create DMG (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          mkdir -p target/dmg-contents target/package
+          cp -R "target/bundled/Dispersion Equalizer.vst3" target/dmg-contents/
+          cp -R "target/bundled/Dispersion Equalizer.clap" target/dmg-contents/
+          hdiutil create \
+            -volname "Dispersion Equalizer" \
+            -srcfolder target/dmg-contents \
+            -ov -format UDZO \
+            "target/package/Dispersion.Equalizer-macos-universal.dmg"
+
+      # ── Windows / Linux: package as ZIP ──────────────────────────────────────
+
+      - name: Create platform zip (Windows / Linux)
+        if: runner.os != 'macOS'
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
@@ -72,7 +155,19 @@ jobs:
             -DestinationPath $zipPath `
             -CompressionLevel Optimal
 
-      - name: Upload artifact
+      # ── Upload artifacts ──────────────────────────────────────────────────────
+
+      - name: Upload artifact (macOS)
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Dispersion.Equalizer-macos-universal
+          path: target/package/Dispersion.Equalizer-macos-universal.dmg
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Upload artifact (Windows / Linux)
+        if: runner.os != 'macOS'
         uses: actions/upload-artifact@v4
         with:
           name: Dispersion.Equalizer-${{ matrix.platform }}
