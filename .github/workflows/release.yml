@@ -88,8 +88,43 @@ jobs:
           cp -Rf "target/universal/Dispersion Equalizer.vst3" "target/bundled/"
           cp -Rf "target/universal/Dispersion Equalizer.clap" "target/bundled/"
 
-      # ── macOS: sign (Developer ID if secrets present, else ad-hoc) ───────────
-      #
+      # ── macOS: import Developer ID certificate into a temporary keychain ──────
+
+      - name: Import signing certificate (macOS)
+        if: runner.os == 'macOS'
+        env:
+          APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        shell: bash
+        run: |
+          MISSING=""
+          [ -z "$APPLE_CERTIFICATE_P12" ]      && MISSING="$MISSING APPLE_CERTIFICATE_P12"
+          [ -z "$APPLE_CERTIFICATE_PASSWORD" ] && MISSING="$MISSING APPLE_CERTIFICATE_PASSWORD"
+          if [ -n "$MISSING" ]; then
+            echo "::error::Missing required secrets:$MISSING"
+            exit 1
+          fi
+
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+          KEYCHAIN_PATH="$RUNNER_TEMP/signing.keychain-db"
+          CERT_PATH="$RUNNER_TEMP/certificate.p12"
+
+          echo "$APPLE_CERTIFICATE_P12" | base64 --decode -o "$CERT_PATH"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: -s \
+            -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          rm -f "$CERT_PATH"
+          echo "SIGNING_KEYCHAIN=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
+
+      # ── macOS: sign with Developer ID ────────────────────────────────────────
+
       - name: Sign macOS bundles
         if: runner.os == 'macOS'
         env:
@@ -182,6 +217,14 @@ jobs:
           xcrun stapler staple   "$DMG"
           xcrun stapler validate "$DMG"
           echo "Notarization complete."
+
+      - name: Clean up keychain (macOS)
+        if: runner.os == 'macOS' && always()
+        shell: bash
+        run: |
+          if [ -n "$SIGNING_KEYCHAIN" ] && [ -f "$SIGNING_KEYCHAIN" ]; then
+            security delete-keychain "$SIGNING_KEYCHAIN" || true
+          fi
 
       - name: Upload notarization logs (macOS)
         if: runner.os == 'macOS'
