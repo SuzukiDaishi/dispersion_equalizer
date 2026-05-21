@@ -10,11 +10,7 @@ use crate::params::PluginParams;
 use nih_plug::prelude::{Param, ParamSetter};
 use nih_plug_egui::{egui, widgets};
 
-pub fn draw_editor(
-    ctx: &egui::Context,
-    setter: &ParamSetter,
-    params: &PluginParams,
-) {
+pub fn draw_editor(ctx: &egui::Context, setter: &ParamSetter, params: &PluginParams) {
     let sample_rate = 48_000.0;
     let mut graph_max_ms = preset_state(params).graph_max_ms;
     let mut snapshot = params.runtime_snapshot();
@@ -74,7 +70,9 @@ pub fn draw_editor(
     let inspector_changed = egui::SidePanel::right("inspector")
         .resizable(false)
         .default_width(290.0)
-        .show(ctx, |ui| inspector::draw(ui, setter, params, &snapshot, &preview))
+        .show(ctx, |ui| {
+            inspector::draw(ui, setter, params, &snapshot, &preview)
+        })
         .inner;
 
     // Refresh before Graph so it sees the inspector change in the same frame.
@@ -153,13 +151,13 @@ fn apply_preset(setter: &ParamSetter, params: &PluginParams, preset: BuiltinPres
         BuiltinPreset::AMinorPenta => {
             set_param(setter, &params.global_delay_ms, 60.0);
             if let Some(node) = params.nodes.get(0) {
-                set_param(setter, &node.enabled, true);
                 set_param(setter, &node.node_type, NodeType::Scale);
                 set_param(setter, &node.freq_hz, 440.0);
                 set_param(setter, &node.amount_ms, 430.0);
                 set_param(setter, &node.width_oct, 0.055);
                 set_param(setter, &node.scale_root, RootNote::A);
                 set_param(setter, &node.scale_mode, ScaleMode::MinorPentatonic);
+                set_param(setter, &node.enabled, true);
             }
         }
         // Low Shelf + Bell — "Bass Push"
@@ -183,11 +181,23 @@ fn handle_graph_action(setter: &ParamSetter, params: &PluginParams, action: Grap
         }
         GraphAction::AddBell { freq_hz, amount_ms } => {
             if let Some(slot) = first_free_slot(params) {
-                configure_node(setter, params, slot, NodeType::Bell, freq_hz, amount_ms, 1.0);
+                configure_node(
+                    setter,
+                    params,
+                    slot,
+                    NodeType::Bell,
+                    freq_hz,
+                    amount_ms,
+                    1.0,
+                );
                 update_preset_state(params, |state| state.selected_slot = Some(slot));
             }
         }
-        GraphAction::Move { slot, freq_hz, amount_ms } => {
+        GraphAction::Move {
+            slot,
+            freq_hz,
+            amount_ms,
+        } => {
             if let Some(node) = params.nodes.get(slot) {
                 set_param(setter, &node.freq_hz, freq_hz);
                 set_param(setter, &node.amount_ms, amount_ms);
@@ -222,11 +232,14 @@ pub fn configure_node(
     width_oct: f32,
 ) {
     if let Some(node) = params.nodes.get(slot) {
-        set_param(setter, &node.enabled, true);
+        // Set dependent parameters first, then enable the node as the final step.
+        // Some hosts (notably Steinberg hosts) can be picky about batched UI edits
+        // when a gate/enable parameter flips before related values are written.
         set_param(setter, &node.node_type, node_type);
         set_param(setter, &node.freq_hz, freq_hz);
         set_param(setter, &node.amount_ms, amount_ms);
         set_param(setter, &node.width_oct, width_oct);
+        set_param(setter, &node.enabled, true);
     }
 }
 
