@@ -26,12 +26,32 @@ After installing [Rust](https://rustup.rs/), you can compile Dispersion Equalize
 cargo xtask bundle dispersion_equalizer --release
 ```
 
+On macOS, you can build CLAP/VST3 + AUv2 with one command:
+
+```shell
+cargo auv2
+```
+
 For development checks:
 
 ```shell
 cargo check
 cargo test
+uv sync --frozen
+uv run python scripts/pedalboard_smoke.py
 ```
+
+If `uv sync --frozen` fails in CI after dependency changes, regenerate the lockfile:
+
+```shell
+uv lock
+```
+
+### Quick commands
+
+- All platforms (CLAP/VST3): `cargo xtask bundle dispersion_equalizer --release`
+- macOS only (CLAP/VST3/AUv2): `cargo auv2`
+- Pedalboard smoke test: `uv run python scripts/pedalboard_smoke.py`
 
 Release instructions are documented in `docs/release.md`.
 
@@ -60,3 +80,15 @@ auval -strict -v aufx DsEQ Zuky
 ```
 
 Then rescan Audio Units in your DAW or restart it.
+
+## Pedalboard smoke test
+
+After bundling the plugin, run a minimal plugin smoke test with Python Pedalboard:
+
+```shell
+uv sync --frozen
+uv run python scripts/pedalboard_smoke.py
+```
+
+This smoke test checks that the plugin can be loaded, parameters can be set, and
+parameter changes create a measurable output difference.
