@@ -28,6 +28,9 @@ pub struct PluginParams {
     #[id = "xfms"]
     pub transition_ms: FloatParam,
 
+    #[id = "peak_guard"]
+    pub peak_guard: BoolParam,
+
     #[nested(array, group = "Nodes")]
     pub nodes: [NodeParams; MAX_NODE_SLOTS],
 }
@@ -111,6 +114,7 @@ impl Default for PluginParams {
             .with_unit(" ms")
             .with_step_size(1.0)
             .with_value_to_string(formatters::v2s_f32_rounded(0)),
+            peak_guard: BoolParam::new("Peak Guard", true),
             nodes: std::array::from_fn(NodeParams::new),
         }
     }
@@ -166,7 +170,8 @@ impl NodeParams {
                     factor: FloatRange::skew_factor(-2.0),
                 },
             )
-            .with_unit(" Hz")
+            // No .with_unit() here: v2s_f32_hz_then_khz already embeds the "Hz"/"kHz" suffix.
+            // Adding .with_unit(" Hz") would produce "900.00 Hz Hz" in the inspector.
             .with_smoother(SmoothingStyle::Logarithmic(20.0))
             .with_value_to_string(formatters::v2s_f32_hz_then_khz(2))
             .with_string_to_value(formatters::s2v_f32_hz_then_khz()),

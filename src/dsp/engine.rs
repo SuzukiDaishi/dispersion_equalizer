@@ -4,6 +4,9 @@ use crate::dsp::smooth::SmoothedParam;
 use crate::dsp::{RuntimeChain, MAX_RUNTIME_SECTIONS};
 use crate::model::RuntimeSnapshot;
 
+/// wet チャンネルのピークリミッター: リリース時定数。
+const LIMITER_RELEASE_MS: f32 = 200.0;
+
 #[derive(Debug)]
 pub struct Engine {
     sample_rate: f32,
@@ -17,6 +20,9 @@ pub struct Engine {
     output_gain: SmoothedParam,
     last_snapshot: Option<RuntimeSnapshot>,
     latency_samples: u32,
+    /// wet チャンネルのピークリミッター用ピーク追跡値。
+    limiter_level: f32,
+    limiter_release_coeff: f32,
 }
 
 impl Default for Engine {
@@ -34,6 +40,8 @@ impl Default for Engine {
             output_gain: SmoothedParam::new(sample_rate, 10.0, 1.0),
             last_snapshot: None,
             latency_samples: 0,
+            limiter_level: 0.0,
+            limiter_release_coeff: limiter_release_coeff(sample_rate),
         }
     }
 }
@@ -47,6 +55,7 @@ impl Engine {
             .prepare_samples(self.sample_rate, MAX_RUNTIME_SECTIONS * 2 + 8);
         self.wet.set_sample_rate(self.sample_rate, 10.0);
         self.output_gain.set_sample_rate(self.sample_rate, 10.0);
+        self.limiter_release_coeff = limiter_release_coeff(self.sample_rate);
     }
 
     pub fn sample_rate(&self) -> f32 {
@@ -68,6 +77,7 @@ impl Engine {
         self.output_gain.reset(1.0);
         self.last_snapshot = None;
         self.latency_samples = 0;
+        self.limiter_level = 0.0;
     }
 
     pub fn set_mix(&mut self, wet: f32, output_gain: f32) {
@@ -130,8 +140,9 @@ impl Engine {
         self.last_snapshot = Some(snapshot);
     }
 
-    pub fn process_stereo(&mut self, input: [f32; 2]) -> [f32; 2] {
+    pub fn process_stereo(&mut self, input: [f32; 2], auto_duck: bool) -> [f32; 2] {
         let dry_frame = self.dry_delay.process(input);
+
         let wet_frame = if self.xfade_pos < self.xfade_len {
             let t = crossfade_position(self.xfade_pos, self.xfade_len);
             self.xfade_pos = self.xfade_pos.saturating_add(1);
@@ -160,12 +171,28 @@ impl Engine {
             self.active_chain_mut().process(input)
         };
 
+        // ── Brickwall Limiter (wet channel) ─────────────────────────────────
+        // インスタントアタック + スローリリースのピークリミッター。
+        // バンチング/allpass 状態変化による振幅スパイクを 0dBFS 以内に抑える。
+        let wet_gain = if auto_duck {
+            let wet_peak = wet_frame[0].abs().max(wet_frame[1].abs());
+            if wet_peak > self.limiter_level {
+                self.limiter_level = wet_peak;
+            } else {
+                self.limiter_level *= self.limiter_release_coeff;
+            }
+            (1.0_f32 / self.limiter_level.max(1.0)).min(1.0)
+        } else {
+            self.limiter_level = 0.0;
+            1.0
+        };
+
         let wet = self.wet.next();
         let dry = 1.0 - wet;
         let gain = self.output_gain.next();
         [
-            sanitize((dry_frame[0] * dry + wet_frame[0] * wet) * gain),
-            sanitize((dry_frame[1] * dry + wet_frame[1] * wet) * gain),
+            sanitize((dry_frame[0] * dry + wet_frame[0] * wet * wet_gain) * gain),
+            sanitize((dry_frame[1] * dry + wet_frame[1] * wet * wet_gain) * gain),
         ]
     }
 
@@ -198,6 +225,13 @@ impl RuntimeChainDescriptor {
     pub fn latency_samples(&self) -> u32 {
         (self.max_sections as u32).saturating_mul(2)
     }
+}
+
+fn limiter_release_coeff(sample_rate: f32) -> f32 {
+    if sample_rate <= 0.0 {
+        return 0.0;
+    }
+    (-1.0_f32 / (LIMITER_RELEASE_MS / 1000.0 * sample_rate)).exp()
 }
 
 fn crossfade_position(pos: u32, len: u32) -> f32 {
@@ -258,4 +292,95 @@ mod tests {
         engine.apply_descriptor(snapshot, descriptor(32), 0.0, true);
         assert_eq!(engine.latency_samples(), 64);
     }
+
+    fn descriptor_with_allpass(global_delay_ms: f32) -> RuntimeChainDescriptor {
+        use crate::compiler::descriptor::SectionDescriptor;
+        let mut sections = ArrayVec::new();
+        sections.push(SectionDescriptor::SecondOrder { freq_hz: 1000.0, q: 30.0 });
+        sections.push(SectionDescriptor::SecondOrder { freq_hz: 3000.0, q: 30.0 });
+        RuntimeChainDescriptor { global_delay_ms, max_sections: 8, sections }
+    }
+
+    /// 0dBFS 矩形波入力で delay 0→1000ms ランプ後も出力が ≤ 1.0 であること。
+    #[test]
+    fn no_clipping_with_noise_through_delay_ramp() {
+        let mut engine = Engine::default();
+        engine.prepare(48_000.0, 512);
+        engine.apply_descriptor(
+            RuntimeSnapshot::default(),
+            descriptor_with_allpass(0.0),
+            0.0, true,
+        );
+        for i in 0..2048 {
+            let x = if i % 2 == 0 { 1.0_f32 } else { -1.0_f32 };
+            engine.process_stereo([x, x], true);
+        }
+        engine.apply_descriptor(
+            RuntimeSnapshot::default(),
+            descriptor_with_allpass(1000.0),
+            0.0, false,
+        );
+        let mut peak: f32 = 0.0;
+        for i in 0..55200 {
+            let x = if i % 2 == 0 { 1.0_f32 } else { -1.0_f32 };
+            let out = engine.process_stereo([x, x], true);
+            peak = peak.max(out[0].abs()).max(out[1].abs());
+        }
+        assert!(peak <= 1.0, "output clipped: peak={peak} (expected ≤ 1.0)");
+    }
+
+    /// 0dBFS サイン波（allpass 共振周波数）で delay 0→1000ms ランプ後も出力が ≤ 1.0 であること。
+    #[test]
+    fn no_clipping_with_sine_through_delay_ramp() {
+        use std::f32::consts::PI;
+        let sample_rate = 48_000.0_f32;
+        let freq = 1000.0_f32;
+        let mut engine = Engine::default();
+        engine.prepare(sample_rate, 512);
+        engine.apply_descriptor(
+            RuntimeSnapshot::default(),
+            descriptor_with_allpass(0.0),
+            0.0, true,
+        );
+        for i in 0..2048 {
+            let x = (2.0 * PI * freq * i as f32 / sample_rate).sin();
+            engine.process_stereo([x, x], true);
+        }
+        engine.apply_descriptor(
+            RuntimeSnapshot::default(),
+            descriptor_with_allpass(1000.0),
+            0.0, false,
+        );
+        let mut peak: f32 = 0.0;
+        for i in 0..55200 {
+            let x = (2.0 * PI * freq * (2048 + i) as f32 / sample_rate).sin();
+            let out = engine.process_stereo([x, x], true);
+            peak = peak.max(out[0].abs()).max(out[1].abs());
+        }
+        assert!(peak <= 1.0, "sine output clipped: peak={peak} (expected ≤ 1.0)");
+    }
+
+    /// auto_duck=true のとき 0dBFS サイン波入力が遅延ランプ中も ≤ 1.0 に保たれること。
+    #[test]
+    fn duck_enabled_keeps_output_bounded() {
+        use std::f32::consts::PI;
+        let sample_rate = 48_000.0_f32;
+        let freq = 1000.0_f32;
+        let mut engine = Engine::default();
+        engine.prepare(sample_rate, 512);
+        engine.apply_descriptor(RuntimeSnapshot::default(), descriptor_with_allpass(0.0), 0.0, true);
+        for i in 0..2048 {
+            let x = (2.0 * PI * freq * i as f32 / sample_rate).sin();
+            engine.process_stereo([x, x], true);
+        }
+        engine.apply_descriptor(RuntimeSnapshot::default(), descriptor_with_allpass(1000.0), 0.0, false);
+        let mut peak: f32 = 0.0;
+        for i in 0..55200 {
+            let x = (2.0 * PI * freq * (2048 + i) as f32 / sample_rate).sin();
+            let out = engine.process_stereo([x, x], true);
+            peak = peak.max(out[0].abs()).max(out[1].abs());
+        }
+        assert!(peak <= 1.0, "duck=on: peak={peak}");
+    }
+
 }

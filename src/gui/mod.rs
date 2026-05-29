@@ -88,7 +88,7 @@ pub fn draw_editor(ctx: &egui::Context, setter: &ParamSetter, params: &PluginPar
             );
             ui.label("Wet");
             ui.add(widgets::ParamSlider::for_param(&params.wet, setter).with_width(100.0));
-            ui.label("Output");
+            ui.label("Gain");
             ui.add(
                 widgets::ParamSlider::for_param(&params.output_gain_db, setter).with_width(100.0),
             );
@@ -100,6 +100,15 @@ pub fn draw_editor(ctx: &egui::Context, setter: &ParamSetter, params: &PluginPar
             ui.add(
                 widgets::ParamSlider::for_param(&params.transition_ms, setter).with_width(100.0),
             );
+            ui.separator();
+            let mut duck = params.peak_guard.value();
+            if ui
+                .checkbox(&mut duck, "Peak Guard")
+                .on_hover_text("Brickwall limiter on the wet channel. Prevents clipping during delay changes.")
+                .changed()
+            {
+                set_param(setter, &params.peak_guard, duck);
+            }
         });
     });
 

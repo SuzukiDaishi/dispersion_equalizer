@@ -40,7 +40,9 @@ pub fn draw(
     graph_max_ms: f32,
 ) -> GraphAction {
     let available = ui.available_size();
-    let size = vec2(available.x.max(420.0), available.y.max(320.0));
+    // Do NOT force a minimum width here — doing so causes the graph to overflow
+    // the CentralPanel bounds and paint over the SidePanel (inspector) on small windows.
+    let size = vec2(available.x.max(200.0), available.y.max(200.0));
     let (rect, response) = ui.allocate_exact_size(size, Sense::click_and_drag());
     let painter = ui.painter_at(rect);
     let graph_rect = Rect::from_min_max(
@@ -185,7 +187,7 @@ pub fn draw(
         }
     }
 
-    draw_status(ui, rect, preview);
+    draw_status(ui, graph_rect, preview);
     action
 }
 
@@ -413,18 +415,20 @@ fn draw_nodes(
     }
 }
 
-fn draw_status(ui: &mut Ui, rect: Rect, preview: &PreviewCurve) {
+/// Draw status info inside the graph rect, top-right corner.
+/// Using shorter labels so the text fits even on narrow (≥ 300 px) graph widths.
+fn draw_status(ui: &mut Ui, graph_rect: Rect, preview: &PreviewCurve) {
     let painter = ui.painter();
     let text = format!(
-        "All-pass sections: {}   Pure delay: {:.1} ms   Fit RMS: {:.2} ms",
+        "SOS: {}   Delay: {:.1} ms   Fit: {:.2} ms",
         preview.section_count, preview.pure_delay_ms, preview.fit_error_ms
     );
     painter.text(
-        rect.left_top() + vec2(14.0, 12.0),
-        egui::Align2::LEFT_TOP,
+        graph_rect.right_top() + vec2(-4.0, 4.0),
+        egui::Align2::RIGHT_TOP,
         text,
-        FontId::monospace(11.0),
-        Color32::from_rgba_unmultiplied(238, 242, 255, 210),
+        FontId::monospace(10.0),
+        Color32::from_rgba_unmultiplied(238, 242, 255, 180),
     );
 }
 

@@ -146,11 +146,17 @@ pub fn draw(
     });
 
     // ── Graph max ─────────────────────────────────────────────────────────────
+    // Allow up to 2000 ms so global + node delay (up to 2000 ms total) is always visible.
+    // Clamp any stale persisted value and write it back silently on the first frame.
     ui.separator();
     ui.label("Graph Max");
-    let mut graph_max = crate::gui::preset_state(params).graph_max_ms;
+    let raw_graph_max = crate::gui::preset_state(params).graph_max_ms;
+    let mut graph_max = raw_graph_max.clamp(50.0, 2000.0);
+    if (graph_max - raw_graph_max).abs() > 0.01 {
+        update_preset_state(params, |state| state.graph_max_ms = graph_max);
+    }
     if ui
-        .add(egui::Slider::new(&mut graph_max, 50.0..=1000.0).suffix(" ms"))
+        .add(egui::Slider::new(&mut graph_max, 50.0..=2000.0).suffix(" ms"))
         .changed()
     {
         update_preset_state(params, |state| state.graph_max_ms = graph_max);

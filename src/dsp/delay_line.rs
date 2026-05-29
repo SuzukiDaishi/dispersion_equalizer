@@ -49,6 +49,7 @@ impl DelayLine {
         self.set_delay_samples(samples, smooth_ms);
     }
 
+
     pub fn set_delay_samples(&mut self, delay_samples: f32, smooth_ms: f32) {
         let max_delay = (self.buffer.len().saturating_sub(4)) as f32;
         let new_delay = delay_samples.max(0.0).clamp(0.0, max_delay);

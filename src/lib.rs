@@ -150,6 +150,8 @@ impl Plugin for DispersionEqualizer {
         self.engine
             .set_mix(snapshot.wet, util::db_to_gain(snapshot.output_gain_db));
 
+        let auto_duck = self.params.peak_guard.value();
+
         self.queue_compile_if_needed(context, self.params.target_snapshot());
         self.apply_finished_compile(context);
 
@@ -161,14 +163,14 @@ impl Plugin for DispersionEqualizer {
                         *channel_samples.get_unchecked_mut(1),
                     ]
                 };
-                let output = self.engine.process_stereo(input);
+                let output = self.engine.process_stereo(input, auto_duck);
                 unsafe {
                     *channel_samples.get_unchecked_mut(0) = output[0];
                     *channel_samples.get_unchecked_mut(1) = output[1];
                 }
             } else if channel_samples.len() == 1 {
                 let mono = unsafe { *channel_samples.get_unchecked_mut(0) };
-                let output = self.engine.process_stereo([mono, mono]);
+                let output = self.engine.process_stereo([mono, mono], auto_duck);
                 unsafe {
                     *channel_samples.get_unchecked_mut(0) = output[0];
                 }

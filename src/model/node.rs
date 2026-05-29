@@ -8,7 +8,7 @@ pub const MAX_NODE_SLOTS: usize = 16;
 pub enum NodeType {
     #[default]
     #[id = "bell"]
-    #[name = "Bell Delay"]
+    #[name = "Bell"]
     Bell,
     #[id = "lows"]
     #[name = "Low Shelf"]
