@@ -317,3 +317,6 @@ impl Vst3Plugin for DispersionEqualizer {
 
 nih_export_clap!(DispersionEqualizer);
 nih_export_vst3!(DispersionEqualizer);
+
+#[cfg(target_os = "macos")]
+clap_wrapper::export_auv2!();

@@ -50,6 +50,26 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            xtask -> target
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          python-version: '3.12'
+
+      - name: Cache uv downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-
+
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
         run: |
@@ -76,11 +96,23 @@ jobs:
       - name: Bundle plugin
         run: cargo xtask bundle dispersion_equalizer --release
 
+      - name: Install Python dependencies (uv)
+        shell: bash
+        run: uv sync --frozen
+
+      - name: Pedalboard smoke test
+        shell: bash
+        run: uv run python scripts/pedalboard_smoke.py
+
       # ── macOS: cross-compile x86_64 binary and merge into Universal ──────────
 
       - name: Cross-compile library for x86_64 (macOS)
         if: runner.os == 'macOS'
         run: cargo build --lib --release --target x86_64-apple-darwin
+
+      - name: Build AUv2 bundle (macOS)
+        if: runner.os == 'macOS'
+        run: cargo auv2
 
       - name: Create Universal macOS bundles
         if: runner.os == 'macOS'
@@ -89,7 +121,7 @@ jobs:
           X64_LIB="target/x86_64-apple-darwin/release/libdispersion_equalizer.dylib"
           mkdir -p "target/universal"
 
-          for PLUGIN_NAME in "Dispersion Equalizer.vst3" "Dispersion Equalizer.clap"; do
+          for PLUGIN_NAME in "Dispersion Equalizer.vst3" "Dispersion Equalizer.clap" "Dispersion Equalizer.component"; do
             ARM_BUNDLE="target/bundled/$PLUGIN_NAME"
             UNI_BUNDLE="target/universal/$PLUGIN_NAME"
             cp -R "$ARM_BUNDLE" "$UNI_BUNDLE"
@@ -107,6 +139,7 @@ jobs:
 
           cp -Rf "target/universal/Dispersion Equalizer.vst3" "target/bundled/"
           cp -Rf "target/universal/Dispersion Equalizer.clap" "target/bundled/"
+          cp -Rf "target/universal/Dispersion Equalizer.component" "target/bundled/"
 
       # ── macOS: import Developer ID certificate into a temporary keychain ──────
 
@@ -172,6 +205,7 @@ jobs:
           }
           sign_bundle "target/bundled/Dispersion Equalizer.vst3"
           sign_bundle "target/bundled/Dispersion Equalizer.clap"
+          sign_bundle "target/bundled/Dispersion Equalizer.component"
 
       # ── macOS: verify signatures ─────────────────────────────────────────────
 
@@ -182,13 +216,27 @@ jobs:
           set -euxo pipefail
           for BUNDLE in \
             "target/bundled/Dispersion Equalizer.vst3" \
-            "target/bundled/Dispersion Equalizer.clap"
+            "target/bundled/Dispersion Equalizer.clap" \
+            "target/bundled/Dispersion Equalizer.component"
           do
             echo "Verifying $BUNDLE"
             codesign --verify --deep --strict --verbose=4 "$BUNDLE"
             BIN=$(find "$BUNDLE/Contents/MacOS" -maxdepth 1 -type f | head -n1)
             codesign --verify --strict --verbose=4 "$BIN"
           done
+
+      # ── macOS: validate AUv2 ──────────────────────────────────────────────────
+
+      - name: Validate AUv2 (macOS)
+        if: runner.os == 'macOS'
+        continue-on-error: true
+        shell: bash
+        run: |
+          mkdir -p "$HOME/Library/Audio/Plug-Ins/Components"
+          cp -R "target/bundled/Dispersion Equalizer.component" \
+            "$HOME/Library/Audio/Plug-Ins/Components/"
+          sleep 3
+          auval -strict -v aufx DsEQ Zuky
 
       # ── macOS: package as DMG ─────────────────────────────────────────────────
 
@@ -200,6 +248,7 @@ jobs:
           mkdir -p target/dmg-contents target/package
           cp -R "target/bundled/Dispersion Equalizer.vst3" target/dmg-contents/
           cp -R "target/bundled/Dispersion Equalizer.clap" target/dmg-contents/
+          cp -R "target/bundled/Dispersion Equalizer.component" target/dmg-contents/
           hdiutil create \
             -volname "Dispersion Equalizer" \
             -srcfolder target/dmg-contents \

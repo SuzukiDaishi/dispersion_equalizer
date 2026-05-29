@@ -19,6 +19,20 @@ artifacts. Public GitHub Releases are created only when a `v*` tag is pushed.
    cargo check
    cargo test
    cargo xtask bundle dispersion_equalizer --release
+   uv sync --frozen
+   uv run python scripts/pedalboard_smoke.py
+   ```
+
+   If `uv sync --frozen` fails after dependency edits, refresh the lock file:
+
+   ```powershell
+   uv lock
+   ```
+
+   On macOS, AUv2 can be generated with a single command:
+
+   ```powershell
+   cargo auv2
    ```
 
 3. Update `version` in `Cargo.toml` to the new version, then commit.
@@ -59,6 +73,7 @@ artifacts. Public GitHub Releases are created only when a `v*` tag is pushed.
    ```text
    Dispersion Equalizer.vst3
    Dispersion Equalizer.clap
+   Dispersion Equalizer.component (macOS)
    ```
 
 ## Notes
@@ -70,3 +85,5 @@ artifacts. Public GitHub Releases are created only when a `v*` tag is pushed.
 - Commit builds are stored as Actions artifacts for 7 days.
 - Release builds target Windows x64, Linux x64, and macOS Universal Binary (arm64 + x86_64).
 - macOS builds are Developer ID signed and notarized via Apple notarytool.
+- CI runs Rust tests plus `scripts/pedalboard_smoke.py` on all three platforms.
+- CI signs macOS artifacts only when Apple signing secrets are available.
