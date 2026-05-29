@@ -1,10 +1,11 @@
 use crate::compiler::descriptor::PreviewCurve;
 use crate::gui::{
-    configure_node, first_free_slot, node_view, selected_slot, set_param, update_preset_state,
+    configure_node, first_free_slot, node_view, selected_slot, set_param, set_state_node_enabled,
+    update_preset_state,
 };
 use crate::model::{NodeType, RuntimeSnapshot};
 use crate::params::PluginParams;
-use nih_plug::prelude::ParamSetter;
+use nih_plug::prelude::{Param, ParamSetter};
 use nih_plug_egui::{egui, widgets};
 
 /// Returns `true` if any state changed this frame (triggers snapshot refresh + repaint).
@@ -138,8 +139,12 @@ pub fn draw(
     ui.horizontal(|ui| {
         if ui.button("Remove").clicked() {
             set_param(setter, &node_params.enabled, false);
+            set_state_node_enabled(params, slot, false);
             update_preset_state(params, |state| {
-                state.selected_slot = params.nodes.iter().position(|node| node.enabled.value());
+                state.selected_slot = params
+                    .nodes
+                    .iter()
+                    .position(|node| node.enabled.unmodulated_plain_value());
             });
             changed = true;
         }
