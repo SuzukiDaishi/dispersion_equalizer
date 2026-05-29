@@ -35,4 +35,28 @@ cargo test
 
 Release instructions are documented in `docs/release.md`.
 
-Both CLAP and VST3 are shipped in every release. macOS builds are Universal Binary (arm64 + x86_64), Developer ID signed, and notarized.
+CLAP, VST3, and AUv2 (Audio Unit) are shipped in every release. macOS builds are Universal Binary (arm64 + x86_64), Developer ID signed, and notarized.
+
+## Audio Unit (AUv2) on macOS
+
+The macOS DMG includes an AUv2 `.component` for Logic Pro and GarageBand.
+
+**Install:**
+
+```bash
+cp -R "Dispersion Equalizer.component" ~/Library/Audio/Plug-Ins/Components/
+```
+
+**If macOS blocks the plugin (unsigned/quarantine):**
+
+```bash
+xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/Components/"Dispersion Equalizer.component"
+```
+
+**Validate:**
+
+```bash
+auval -strict -v aufx DsEQ Zuky
+```
+
+Then rescan Audio Units in your DAW or restart it.
