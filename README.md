@@ -95,7 +95,10 @@ uv run python scripts/pedalboard_smoke.py
 ```
 
 On macOS, force the smoke test to load only the AUv2 component instead of
-falling back to VST3 when checking Logic/GarageBand-facing output:
+falling back to VST3 when checking Logic/GarageBand-facing output. The script
+copies `target/bundled/Dispersion Equalizer.component` to
+`~/Library/Audio/Plug-Ins/Components/` first because Audio Units must be installed
+in a standard Components folder before Pedalboard/macOS can scan them:
 
 ```shell
 PREFERRED_PLUGIN_FORMAT=auv2 uv run python scripts/pedalboard_smoke.py

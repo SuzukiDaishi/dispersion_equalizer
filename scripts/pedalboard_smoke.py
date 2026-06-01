@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import platform
+import shutil
 from pathlib import Path
 
 import numpy as np
@@ -11,6 +12,8 @@ ROOT = Path(__file__).resolve().parents[1]
 BUNDLE_DIR = ROOT / "target" / "bundled"
 VST3_BUNDLE = BUNDLE_DIR / "Dispersion Equalizer.vst3"
 AUV2_COMPONENT = BUNDLE_DIR / "Dispersion Equalizer.component"
+AUV2_INSTALL_DIR = Path.home() / "Library" / "Audio" / "Plug-Ins" / "Components"
+INSTALLED_AUV2_COMPONENT = AUV2_INSTALL_DIR / AUV2_COMPONENT.name
 SAMPLE_RATE = 48_000
 
 
@@ -20,7 +23,7 @@ def resolve_plugin_candidates() -> list[Path]:
 
     if preferred:
         if system == "Darwin" and preferred in {"au", "auv2", "component"}:
-            return [AUV2_COMPONENT] if AUV2_COMPONENT.exists() else []
+            return resolve_auv2_candidates()
         if preferred in {"vst3", "vst"}:
             return resolve_vst3_candidates(system)
         raise ValueError(
@@ -31,9 +34,23 @@ def resolve_plugin_candidates() -> list[Path]:
     candidates.extend(resolve_vst3_candidates(system))
 
     if system == "Darwin":
-        candidates.append(AUV2_COMPONENT)
+        candidates.extend(resolve_auv2_candidates())
 
     return unique_existing_paths(candidates)
+
+
+def resolve_auv2_candidates() -> list[Path]:
+    if AUV2_COMPONENT.exists():
+        AUV2_INSTALL_DIR.mkdir(parents=True, exist_ok=True)
+        if INSTALLED_AUV2_COMPONENT.exists():
+            if INSTALLED_AUV2_COMPONENT.is_dir():
+                shutil.rmtree(INSTALLED_AUV2_COMPONENT)
+            else:
+                INSTALLED_AUV2_COMPONENT.unlink()
+        shutil.copytree(AUV2_COMPONENT, INSTALLED_AUV2_COMPONENT, symlinks=True)
+        return [INSTALLED_AUV2_COMPONENT]
+
+    return [INSTALLED_AUV2_COMPONENT] if INSTALLED_AUV2_COMPONENT.exists() else []
 
 
 def resolve_vst3_candidates(system: str) -> list[Path]:
@@ -70,7 +87,12 @@ def load_plugin_from_candidates() -> tuple[pedalboard.Plugin, Path]:
     candidates = resolve_plugin_candidates()
     if not candidates:
         raise FileNotFoundError(
-            "No plugin bundle was found in target/bundled. Run `cargo xtask bundle dispersion_equalizer --release` first; on macOS run `cargo auv2 --release` to include AUv2."
+            "No plugin bundle was found in target/bundled. Run "
+            "`cargo xtask bundle dispersion_equalizer --release` first; on macOS "
+            "run `cargo auv2 --release` to include AUv2. The AUv2 smoke test "
+            "copies the component to ~/Library/Audio/Plug-Ins/Components before "
+            "loading because Audio Units must be installed in a standard Components "
+            "folder."
         )
 
     errors: list[str] = []
