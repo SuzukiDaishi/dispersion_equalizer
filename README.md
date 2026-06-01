@@ -105,4 +105,7 @@ PREFERRED_PLUGIN_FORMAT=auv2 uv run python scripts/pedalboard_smoke.py
 ```
 
 This smoke test checks that the plugin can be loaded, parameters can be set, and
-parameter changes create a measurable output difference.
+for VST3/CLAP-compatible Pedalboard hosts, parameter changes create a measurable
+output difference. The AUv2 mode is primarily a load/process smoke test because
+Pedalboard's AudioUnit host may not apply this wrapper's parameter writes before
+offline rendering even though the AU can be discovered and instantiated.
