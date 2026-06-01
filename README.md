@@ -26,11 +26,15 @@ After installing [Rust](https://rustup.rs/), you can compile Dispersion Equalize
 cargo xtask bundle dispersion_equalizer --release
 ```
 
-On macOS, you can build CLAP/VST3 + AUv2 with one command:
+On macOS, you can build release CLAP/VST3 + AUv2 bundles with one command:
 
 ```shell
-cargo auv2
+cargo auv2 --release
 ```
+
+`cargo auv2` also defaults to release output so the AUv2 arm64 slice matches the
+release x86_64 slice used for universal macOS packages. Use `cargo xtask auv2
+--debug` only for local debugging.
 
 For development checks:
 
@@ -50,7 +54,7 @@ uv lock
 ### Quick commands
 
 - All platforms (CLAP/VST3): `cargo xtask bundle dispersion_equalizer --release`
-- macOS only (CLAP/VST3/AUv2): `cargo auv2`
+- macOS only (CLAP/VST3/AUv2): `cargo auv2 --release`
 - Pedalboard smoke test: `uv run python scripts/pedalboard_smoke.py`
 
 Release instructions are documented in `docs/release.md`.
@@ -90,5 +94,18 @@ uv sync --frozen
 uv run python scripts/pedalboard_smoke.py
 ```
 
+On macOS, force the smoke test to load only the AUv2 component instead of
+falling back to VST3 when checking Logic/GarageBand-facing output. The script
+copies `target/bundled/Dispersion Equalizer.component` to
+`~/Library/Audio/Plug-Ins/Components/` first because Audio Units must be installed
+in a standard Components folder before Pedalboard/macOS can scan them:
+
+```shell
+PREFERRED_PLUGIN_FORMAT=auv2 uv run python scripts/pedalboard_smoke.py
+```
+
 This smoke test checks that the plugin can be loaded, parameters can be set, and
-parameter changes create a measurable output difference.
+for VST3/CLAP-compatible Pedalboard hosts, parameter changes create a measurable
+output difference. The AUv2 mode is primarily a load/process smoke test because
+Pedalboard's AudioUnit host may not apply this wrapper's parameter writes before
+offline rendering even though the AU can be discovered and instantiated.
