@@ -112,7 +112,12 @@ jobs:
 
       - name: Build AUv2 bundle (macOS)
         if: runner.os == 'macOS'
-        run: cargo auv2
+        run: cargo auv2 --release
+
+      - name: Pedalboard AUv2 smoke test (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: PREFERRED_PLUGIN_FORMAT=auv2 uv run python scripts/pedalboard_smoke.py
 
       - name: Create Universal macOS bundles
         if: runner.os == 'macOS'
@@ -134,7 +139,12 @@ jobs:
             OUT_BIN="$UNI_BUNDLE/Contents/MacOS/$(basename "$ARM_BIN")"
 
             lipo -create "$ARM_BIN" "$X64_LIB" -output "$OUT_BIN"
-            echo "$PLUGIN_NAME: $(lipo -archs "$OUT_BIN")"
+            ARCHS=$(lipo -archs "$OUT_BIN")
+            echo "$PLUGIN_NAME: $ARCHS"
+            if [[ " $ARCHS " != *" arm64 "* || " $ARCHS " != *" x86_64 "* ]]; then
+              echo "::error::$PLUGIN_NAME is not universal arm64+x86_64: $ARCHS"
+              exit 1
+            fi
           done
 
           cp -Rf "target/universal/Dispersion Equalizer.vst3" "target/bundled/"
@@ -229,12 +239,27 @@ jobs:
 
       - name: Validate AUv2 (macOS)
         if: runner.os == 'macOS'
-        continue-on-error: true
         shell: bash
         run: |
+          set -euxo pipefail
+          COMPONENT="target/bundled/Dispersion Equalizer.component"
+          BIN=$(find "$COMPONENT/Contents/MacOS" -maxdepth 1 -type f | head -n1)
+          test -n "$BIN"
+          ARCHS=$(lipo -archs "$BIN")
+          echo "AUv2 architectures: $ARCHS"
+          if [[ " $ARCHS " != *" arm64 "* || " $ARCHS " != *" x86_64 "* ]]; then
+            echo "::error::AUv2 component is not universal arm64+x86_64: $ARCHS"
+            exit 1
+          fi
+          plutil -p "$COMPONENT/Contents/Info.plist"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :AudioComponents:0:type' "$COMPONENT/Contents/Info.plist")" = "aufx"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :AudioComponents:0:subtype' "$COMPONENT/Contents/Info.plist")" = "DsEQ"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :AudioComponents:0:manufacturer' "$COMPONENT/Contents/Info.plist")" = "Zuky"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$COMPONENT/Contents/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$COMPONENT/Contents/Info.plist"
           mkdir -p "$HOME/Library/Audio/Plug-Ins/Components"
-          cp -R "target/bundled/Dispersion Equalizer.component" \
-            "$HOME/Library/Audio/Plug-Ins/Components/"
+          rm -rf "$HOME/Library/Audio/Plug-Ins/Components/Dispersion Equalizer.component"
+          cp -R "$COMPONENT" "$HOME/Library/Audio/Plug-Ins/Components/"
           sleep 3
           auval -strict -v aufx DsEQ Zuky
 

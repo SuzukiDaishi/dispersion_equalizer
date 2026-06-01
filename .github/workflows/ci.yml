@@ -88,7 +88,12 @@ jobs:
 
       - name: Build AUv2 bundle (macOS)
         if: runner.os == 'macOS'
-        run: cargo auv2
+        run: cargo auv2 --release
+
+      - name: Pedalboard AUv2 smoke test (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: PREFERRED_PLUGIN_FORMAT=auv2 uv run python scripts/pedalboard_smoke.py
 
       # ── macOS: cross-compile x86_64 binary and merge into Universal ──────────
 
@@ -116,7 +121,12 @@ jobs:
             OUT_BIN="$UNI_BUNDLE/Contents/MacOS/$(basename "$ARM_BIN")"
 
             lipo -create "$ARM_BIN" "$X64_LIB" -output "$OUT_BIN"
-            echo "$PLUGIN_NAME: $(lipo -archs "$OUT_BIN")"
+            ARCHS=$(lipo -archs "$OUT_BIN")
+            echo "$PLUGIN_NAME: $ARCHS"
+            if [[ " $ARCHS " != *" arm64 "* || " $ARCHS " != *" x86_64 "* ]]; then
+              echo "::error::$PLUGIN_NAME is not universal arm64+x86_64: $ARCHS"
+              exit 1
+            fi
           done
 
           cp -Rf "target/universal/Dispersion Equalizer.vst3" "target/bundled/"

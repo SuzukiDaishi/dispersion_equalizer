@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import platform
 from pathlib import Path
 
@@ -15,8 +16,28 @@ SAMPLE_RATE = 48_000
 
 def resolve_plugin_candidates() -> list[Path]:
     system = platform.system()
+    preferred = os.environ.get("PREFERRED_PLUGIN_FORMAT", "").casefold()
+
+    if preferred:
+        if system == "Darwin" and preferred in {"au", "auv2", "component"}:
+            return [AUV2_COMPONENT] if AUV2_COMPONENT.exists() else []
+        if preferred in {"vst3", "vst"}:
+            return resolve_vst3_candidates(system)
+        raise ValueError(
+            f"Unsupported PREFERRED_PLUGIN_FORMAT={preferred!r}; expected 'auv2' on macOS or 'vst3'."
+        )
 
     candidates: list[Path] = [VST3_BUNDLE]
+    candidates.extend(resolve_vst3_candidates(system))
+
+    if system == "Darwin":
+        candidates.append(AUV2_COMPONENT)
+
+    return unique_existing_paths(candidates)
+
+
+def resolve_vst3_candidates(system: str) -> list[Path]:
+    candidates: list[Path] = []
 
     if system == "Windows":
         candidates.insert(
@@ -30,21 +51,26 @@ def resolve_plugin_candidates() -> list[Path]:
         )
         candidates.extend((VST3_BUNDLE / "Contents").glob("*linux*/dispersion_equalizer.so"))
     elif system == "Darwin":
-        candidates.extend(
-            [
-                VST3_BUNDLE / "Contents" / "MacOS" / "Dispersion Equalizer",
-                AUV2_COMPONENT,
-            ]
-        )
+        candidates.append(VST3_BUNDLE / "Contents" / "MacOS" / "Dispersion Equalizer")
 
-    return [candidate for candidate in candidates if candidate.exists()]
+    return candidates
+
+
+def unique_existing_paths(candidates: list[Path]) -> list[Path]:
+    seen: set[Path] = set()
+    existing: list[Path] = []
+    for candidate in candidates:
+        if candidate.exists() and candidate not in seen:
+            seen.add(candidate)
+            existing.append(candidate)
+    return existing
 
 
 def load_plugin_from_candidates() -> tuple[pedalboard.Plugin, Path]:
     candidates = resolve_plugin_candidates()
     if not candidates:
         raise FileNotFoundError(
-            "No plugin bundle was found in target/bundled. Run `cargo xtask bundle dispersion_equalizer --release` first."
+            "No plugin bundle was found in target/bundled. Run `cargo xtask bundle dispersion_equalizer --release` first; on macOS run `cargo auv2 --release` to include AUv2."
         )
 
     errors: list[str] = []

@@ -29,11 +29,14 @@ artifacts. Public GitHub Releases are created only when a `v*` tag is pushed.
    uv lock
    ```
 
-   On macOS, AUv2 can be generated with a single command:
+   On macOS, AUv2 can be generated with a single release-profile command:
 
    ```powershell
-   cargo auv2
+   cargo auv2 --release
    ```
+
+   `cargo auv2` defaults to release output as well. Do not use a debug AUv2
+   bundle for release validation or for universal binary packaging.
 
 3. Update `version` in `Cargo.toml` to the new version, then commit.
    This is the **only place** to change the version — `Plugin::VERSION` reads
