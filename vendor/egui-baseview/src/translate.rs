@@ -3,6 +3,8 @@ pub(crate) fn translate_mouse_button(button: baseview::MouseButton) -> Option<eg
         baseview::MouseButton::Left => Some(egui::PointerButton::Primary),
         baseview::MouseButton::Right => Some(egui::PointerButton::Secondary),
         baseview::MouseButton::Middle => Some(egui::PointerButton::Middle),
+        baseview::MouseButton::Back => Some(egui::PointerButton::Extra1),
+        baseview::MouseButton::Forward => Some(egui::PointerButton::Extra2),
         _ => None,
     }
 }
@@ -10,24 +12,31 @@ pub(crate) fn translate_mouse_button(button: baseview::MouseButton) -> Option<eg
 pub(crate) fn translate_virtual_key(key: &keyboard_types::Key) -> Option<egui::Key> {
     use egui::Key;
     use keyboard_types::Key as K;
+    use keyboard_types::NamedKey as N;
 
     Some(match key {
-        K::ArrowDown => Key::ArrowDown,
-        K::ArrowLeft => Key::ArrowLeft,
-        K::ArrowRight => Key::ArrowRight,
-        K::ArrowUp => Key::ArrowUp,
+        K::Named(named) => match named {
+            N::ArrowDown => Key::ArrowDown,
+            N::ArrowLeft => Key::ArrowLeft,
+            N::ArrowRight => Key::ArrowRight,
+            N::ArrowUp => Key::ArrowUp,
 
-        K::Escape => Key::Escape,
-        K::Tab => Key::Tab,
-        K::Backspace => Key::Backspace,
-        K::Enter => Key::Enter,
+            N::Escape => Key::Escape,
+            N::Tab => Key::Tab,
+            N::Backspace => Key::Backspace,
+            N::Enter => Key::Enter,
 
-        K::Insert => Key::Insert,
-        K::Delete => Key::Delete,
-        K::Home => Key::Home,
-        K::End => Key::End,
-        K::PageUp => Key::PageUp,
-        K::PageDown => Key::PageDown,
+            N::Insert => Key::Insert,
+            N::Delete => Key::Delete,
+            N::Home => Key::Home,
+            N::End => Key::End,
+            N::PageUp => Key::PageUp,
+            N::PageDown => Key::PageDown,
+
+            _ => {
+                return None;
+            }
+        },
 
         K::Character(s) => match s.chars().next()? {
             ' ' => Key::Space,
@@ -71,6 +80,7 @@ pub(crate) fn translate_virtual_key(key: &keyboard_types::Key) -> Option<egui::K
                 return None;
             }
         },
+        #[allow(unreachable_patterns)]
         _ => {
             return None;
         }

@@ -1,17 +1,20 @@
 //! An [`Editor`] implementation for egui.
 
-use crate::egui::Vec2;
-use crate::egui::ViewportCommand;
 use crate::EguiState;
+use baseview::dpi::LogicalSize;
 use baseview::gl::GlConfig;
-use baseview::PhySize;
-use baseview::{Size, WindowHandle, WindowOpenOptions, WindowScalePolicy};
+use baseview::{WindowHandle, WindowOpenOptions, WindowScalePolicy};
 use crossbeam::atomic::AtomicCell;
 use egui_baseview::egui::Context;
 use egui_baseview::EguiWindow;
 use nih_plug::prelude::{Editor, GuiContext, ParamSetter, ParentWindowHandle};
 use parking_lot::RwLock;
-use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
+use raw_window_handle::{
+    AppKitWindowHandle, HandleError, HasWindowHandle, RawWindowHandle, Win32WindowHandle,
+    XcbWindowHandle,
+};
+use std::num::{NonZeroIsize, NonZeroU32};
+use std::ptr::NonNull;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
@@ -31,29 +34,30 @@ pub(crate) struct EguiEditor<T> {
     pub(crate) scaling_factor: AtomicCell<Option<f32>>,
 }
 
-/// This version of `baseview` uses a different version of `raw_window_handle than NIH-plug, so we
+/// This version of `baseview` uses a different version of `raw_window_handle` than NIH-plug, so we
 /// need to adapt it ourselves.
 struct ParentWindowHandleAdapter(nih_plug::editor::ParentWindowHandle);
 
-unsafe impl HasRawWindowHandle for ParentWindowHandleAdapter {
-    fn raw_window_handle(&self) -> RawWindowHandle {
-        match self.0 {
+impl HasWindowHandle for ParentWindowHandleAdapter {
+    fn window_handle(&self) -> Result<raw_window_handle::WindowHandle<'_>, HandleError> {
+        let raw = match self.0 {
             ParentWindowHandle::X11Window(window) => {
-                let mut handle = raw_window_handle::XcbWindowHandle::empty();
-                handle.window = window;
-                RawWindowHandle::Xcb(handle)
+                let window = NonZeroU32::new(window).ok_or(HandleError::Unavailable)?;
+                RawWindowHandle::Xcb(XcbWindowHandle::new(window))
             }
             ParentWindowHandle::AppKitNsView(ns_view) => {
-                let mut handle = raw_window_handle::AppKitWindowHandle::empty();
-                handle.ns_view = ns_view;
-                RawWindowHandle::AppKit(handle)
+                let ns_view = NonNull::new(ns_view).ok_or(HandleError::Unavailable)?;
+                RawWindowHandle::AppKit(AppKitWindowHandle::new(ns_view))
             }
             ParentWindowHandle::Win32Hwnd(hwnd) => {
-                let mut handle = raw_window_handle::Win32WindowHandle::empty();
-                handle.hwnd = hwnd;
-                RawWindowHandle::Win32(handle)
+                let hwnd = NonZeroIsize::new(hwnd as isize).ok_or(HandleError::Unavailable)?;
+                RawWindowHandle::Win32(Win32WindowHandle::new(hwnd))
             }
-        }
+        };
+
+        // SAFETY: The host guarantees that the parent window handle stays valid for at least as
+        // long as the editor is open, which outlives this borrow.
+        unsafe { Ok(raw_window_handle::WindowHandle::borrow_raw(raw)) }
     }
 }
 
@@ -73,34 +77,44 @@ where
 
         let (unscaled_width, unscaled_height) = self.egui_state.size();
         let scaling_factor = self.scaling_factor.load();
-        let window = EguiWindow::open_parented(
-            &ParentWindowHandleAdapter(parent),
-            WindowOpenOptions {
-                title: String::from("egui window"),
-                // Baseview should be doing the DPI scaling for us
-                size: Size::new(unscaled_width as f64, unscaled_height as f64),
-                // NOTE: For some reason passing 1.0 here causes the UI to be scaled on macOS but
-                //       not the mouse events.
-                scale: scaling_factor
+        let window_open_options = WindowOpenOptions::new()
+            .with_title("egui window")
+            // Baseview should be doing the DPI scaling for us
+            .with_size(LogicalSize::new(
+                unscaled_width as f64,
+                unscaled_height as f64,
+            ))
+            // NOTE: For some reason passing 1.0 here causes the UI to be scaled on macOS but
+            //       not the mouse events.
+            .with_scale_policy(
+                scaling_factor
                     .map(|factor| WindowScalePolicy::ScaleFactor(factor as f64))
                     .unwrap_or(WindowScalePolicy::SystemScaleFactor),
+            );
+        // Keep the OpenGL requirements as loose as possible: egui only draws 2D geometry, so
+        // it needs neither a depth/stencil buffer nor an sRGB-capable framebuffer
+        // (`egui_glow` explicitly disables `FRAMEBUFFER_SRGB` and outputs gamma-space colors).
+        // Strict requirements make context creation fail entirely on environments without
+        // matching framebuffer configs, such as VMs and remote desktop sessions.
+        #[cfg(feature = "opengl")]
+        let window_open_options = window_open_options.with_gl_config(GlConfig {
+            version: (3, 2),
+            red_bits: 8,
+            blue_bits: 8,
+            green_bits: 8,
+            alpha_bits: 8,
+            depth_bits: 0,
+            stencil_bits: 0,
+            samples: None,
+            srgb: false,
+            double_buffer: true,
+            vsync: true,
+            ..Default::default()
+        });
 
-                #[cfg(feature = "opengl")]
-                gl_config: Some(GlConfig {
-                    version: (3, 2),
-                    red_bits: 8,
-                    blue_bits: 8,
-                    green_bits: 8,
-                    alpha_bits: 8,
-                    depth_bits: 24,
-                    stencil_bits: 8,
-                    samples: None,
-                    srgb: true,
-                    double_buffer: true,
-                    vsync: true,
-                    ..Default::default()
-                }),
-            },
+        let window = EguiWindow::open_parented(
+            &ParentWindowHandleAdapter(parent),
+            window_open_options,
             Default::default(),
             state,
             move |egui_ctx, _queue, state| build(egui_ctx, &mut state.write()),
@@ -111,12 +125,13 @@ where
                 if let Some(new_size) = egui_state.requested_size.swap(None) {
                     // Ask the plugin host to resize to self.size()
                     if context.request_resize() {
-                        // Resize the content of egui window
-                        queue.resize(PhySize::new(new_size.0, new_size.1));
-                        egui_ctx.send_viewport_cmd(ViewportCommand::InnerSize(Vec2::new(
-                            new_size.0 as f32,
-                            new_size.1 as f32,
-                        )));
+                        // Resize the actual OS window. The size is in logical pixels; baseview
+                        // applies the DPI scale factor and reports the resulting size back
+                        // through its resize notification.
+                        queue.resize(LogicalSize::new(
+                            new_size.0 as f64,
+                            new_size.1 as f64,
+                        ));
 
                         // Update the state
                         egui_state.size.store(new_size);
