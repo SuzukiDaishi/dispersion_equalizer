@@ -1,14 +1,27 @@
 use crate::model::{
     NodeRuntimeParams, NodeType, PresetState, RootNote, RuntimeSnapshot, ScaleMode, MAX_NODE_SLOTS,
 };
+use atomic_float::AtomicF32;
 use nih_plug::prelude::*;
 use nih_plug_egui::EguiState;
 use std::sync::{Arc, Mutex};
+
+/// The editor's size in logical pixels at a 100% UI scale.
+pub const EDITOR_BASE_SIZE: (u32, u32) = (1024, 680);
+
+/// The range the user-adjustable UI scale can be set to.
+pub const GUI_SCALE_RANGE: (f32, f32) = (0.75, 2.0);
 
 #[derive(Params)]
 pub struct PluginParams {
     #[persist = "editor"]
     pub editor_state: Arc<EguiState>,
+
+    /// User-adjustable UI scale factor, applied on top of the system/host DPI scale. Acts as a
+    /// safety net for environments where automatic DPI detection is wrong, and lets the window
+    /// fit on small screens.
+    #[persist = "gui_scale"]
+    pub gui_scale: Arc<AtomicF32>,
 
     #[persist = "preset"]
     pub preset_state: Arc<Mutex<PresetState>>,
@@ -62,7 +75,8 @@ pub struct NodeParams {
 impl Default for PluginParams {
     fn default() -> Self {
         Self {
-            editor_state: EguiState::from_size(1024, 680),
+            editor_state: EguiState::from_size(EDITOR_BASE_SIZE.0, EDITOR_BASE_SIZE.1),
+            gui_scale: Arc::new(AtomicF32::new(1.0)),
             preset_state: Arc::new(Mutex::new(PresetState::default())),
             global_delay_ms: FloatParam::new(
                 "Global Delay",

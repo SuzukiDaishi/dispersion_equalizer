@@ -1,0 +1,41 @@
+[package]
+name = "egui-baseview"
+version = "0.5.0"
+authors = ["Billy Messenger <60663878+BillyDM@users.noreply.github.com>"]
+edition = "2021"
+description = "A baseview backend for egui"
+license = "MIT"
+repository = "https://github.com/BillyDM/egui-baseview"
+documentation = "https://docs.rs/egui-baseview"
+keywords = ["gui", "ui", "graphics", "interface", "widgets"]
+categories = ["gui"]
+readme = "README.md"
+publish = false
+
+# NOTE: This is a vendored copy of egui-baseview (upstream rev
+# ec70c3fe6b2f070dcacbc22924431edbe24bd1c0), ported to baseview 0.2.1 to pick up
+# upstream DPI-scaling, mouse-input, and Wine fixes. See ../README.md.
+
+[features]
+default = ["opengl", "default_fonts"]
+default_fonts = ["egui/default_fonts"]
+opengl = ["dep:egui_glow", "baseview/opengl"]
+## Enable parallel tessellation using [`rayon`](https://docs.rs/rayon).
+##
+## This can help performance for graphics-intense applications.
+rayon = ["egui/rayon"]
+## Enables a temporary workaround for keyboard input not working sometimes in Windows.
+## See https://github.com/BillyDM/egui-baseview/issues/20
+windows_keyboard_workaround = []
+
+[dependencies]
+egui = { version = "0.31", default-features = false, features = ["bytemuck"] }
+egui_glow = { version = "0.31", features = ["x11"], optional = true }
+keyboard-types = { version = "0.8.3", default-features = false }
+baseview = { git = "https://github.com/RustAudio/baseview.git", rev = "a084fc1a7e0074acd9c5e59b9eea65bf700b059c" }
+raw-window-handle = "0.6"
+# TODO: Enable wayland feature when baseview gets wayland support.
+copypasta = { version = "0.10", default-features = false, features = ["x11"] }
+log = "0.4"
+open = "5.1"
+thiserror = "2.0"

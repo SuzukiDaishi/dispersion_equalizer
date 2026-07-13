@@ -61,6 +61,22 @@ Release instructions are documented in `docs/release.md`.
 
 CLAP, VST3, and AUv2 (Audio Unit) are shipped in every release. macOS builds are Universal Binary (arm64 + x86_64), Developer ID signed, and notarized.
 
+## GUI troubleshooting
+
+The editor is built to work across environments, including HiDPI/scaled Windows
+setups, remote desktop sessions, VMs, Wine/yabridge, and X11 with non-standard
+scaling (the GUI windowing stack is vendored and patched for this — see
+`vendor/README.md`).
+
+- **Wrong UI size, or the window doesn't fit the screen:** use the **UI %**
+  selector at the top-right of the editor (75–200%). The setting is stored with
+  the plugin state.
+- **Requirements:** OpenGL 3.2 (a software renderer such as Mesa llvmpipe is
+  enough). On Linux the editor uses X11, so pure-Wayland sessions need XWayland.
+- If clicks land at the wrong position or the editor stays blank in a specific
+  host/environment, please open an issue with the OS, display scale, and host
+  name.
+
 ## Audio Unit (AUv2) on macOS
 
 The macOS DMG includes an AUv2 `.component` for Logic Pro and GarageBand.

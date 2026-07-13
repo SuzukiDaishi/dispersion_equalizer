@@ -64,6 +64,10 @@ pub fn draw_editor(ctx: &egui::Context, setter: &ParamSetter, params: &PluginPar
                     apply_preset(setter, params, BuiltinPreset::BassPush);
                     changed = true;
                 }
+
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    draw_ui_scale_selector(ui, ctx, params);
+                });
             });
         });
         changed
@@ -162,6 +166,43 @@ enum BuiltinPreset {
     VocalAir,
     AMinorPenta,
     BassPush,
+}
+
+/// A UI scale selector, as a safety net for environments where automatic DPI detection
+/// produces a wrong size and to let the window fit on small screens. The zoom factor is
+/// applied by egui itself, and the OS window is resized to match so the content neither
+/// gets cropped nor leaves empty space.
+fn draw_ui_scale_selector(ui: &mut egui::Ui, ctx: &egui::Context, params: &PluginParams) {
+    use crate::params::{EDITOR_BASE_SIZE, GUI_SCALE_RANGE};
+    use std::sync::atomic::Ordering;
+
+    let current = params
+        .gui_scale
+        .load(Ordering::Relaxed)
+        .clamp(GUI_SCALE_RANGE.0, GUI_SCALE_RANGE.1);
+    let mut selected_pct = (current * 100.0).round() as u32;
+
+    egui::ComboBox::from_id_salt("ui-scale")
+        .selected_text(format!("UI {}%", selected_pct))
+        .width(84.0)
+        .show_ui(ui, |ui| {
+            for pct in [75_u32, 100, 125, 150, 175, 200] {
+                ui.selectable_value(&mut selected_pct, pct, format!("{pct}%"));
+            }
+        });
+
+    let new_scale = (selected_pct as f32 / 100.0).clamp(GUI_SCALE_RANGE.0, GUI_SCALE_RANGE.1);
+    if (new_scale - current).abs() > 0.001 {
+        params.gui_scale.store(new_scale, Ordering::Relaxed);
+        ctx.set_zoom_factor(new_scale);
+
+        // Resize the window so the scaled content still fits exactly. The actual resize is
+        // performed by the editor once the host accepts the new size.
+        params.editor_state.set_requested_size((
+            (EDITOR_BASE_SIZE.0 as f32 * new_scale).round() as u32,
+            (EDITOR_BASE_SIZE.1 as f32 * new_scale).round() as u32,
+        ));
+    }
 }
 
 fn apply_preset(setter: &ParamSetter, params: &PluginParams, preset: BuiltinPreset) {
