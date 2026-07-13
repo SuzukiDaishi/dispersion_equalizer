@@ -89,8 +89,9 @@ where
     clipboard_ctx: Option<copypasta::ClipboardContext>,
 
     physical_size: PhysicalSize<u32>,
+    /// The window's scale factor (physical pixels per *native* logical point). This does NOT
+    /// include egui's zoom factor; see [`Inner::effective_points_per_pixel`].
     pixels_per_point: f32,
-    points_per_pixel: f32,
     bg_color: Rgba,
     repaint_after: Option<Instant>,
 }
@@ -202,7 +203,6 @@ where
 
                 physical_size,
                 pixels_per_point,
-                points_per_pixel,
                 bg_color,
                 repaint_after: Some(start_time),
             }),
@@ -307,6 +307,14 @@ where
         self.egui_input.modifiers.shift = !(*modifiers & Modifiers::SHIFT).is_empty();
         self.egui_input.modifiers.command = !(*modifiers & Modifiers::CONTROL).is_empty();
     }
+
+    /// The physical-pixels-to-egui-points conversion factor, taking both the window's scale
+    /// factor and egui's own zoom factor (`Context::zoom_factor`) into account. egui events and
+    /// the screen rect must be expressed in zoomed points, or input positions would no longer
+    /// line up with the drawn UI when an application changes the zoom factor.
+    fn effective_points_per_pixel(&self) -> f32 {
+        (self.pixels_per_point * self.egui_ctx.zoom_factor()).recip()
+    }
 }
 
 impl<State, U> WindowHandler for EguiWindow<State, U>
@@ -329,17 +337,21 @@ where
 
         {
             let inner = &mut *self.inner.borrow_mut();
-            let Some(state) = &mut inner.user_state else {
+            if inner.user_state.is_none() {
                 return;
-            };
+            }
 
             inner.egui_input.time = Some(inner.start_time.elapsed().as_secs_f64());
             inner.egui_input.screen_rect = Some(calculate_screen_rect(
                 inner.physical_size,
-                inner.points_per_pixel,
+                inner.effective_points_per_pixel(),
             ));
 
             inner.egui_ctx.begin_pass(inner.egui_input.take());
+
+            let Some(state) = &mut inner.user_state else {
+                unreachable!("user_state was checked above");
+            };
 
             let mut queue = Queue::new(
                 &mut inner.bg_color,
@@ -386,7 +398,9 @@ where
 
             if do_repaint_now {
                 let physical_size = inner.physical_size;
-                let pixels_per_point = inner.pixels_per_point;
+                // Use the pixels-per-point value egui actually used for this frame, which
+                // includes egui's zoom factor on top of the window's scale factor.
+                let pixels_per_point = full_output.pixels_per_point;
                 let bg_color = inner.bg_color;
                 inner.renderer.render(
                     &self.window_ctx,
@@ -460,11 +474,11 @@ where
             WindowScalePolicy::ScaleFactor(scale) => scale,
             WindowScalePolicy::SystemScaleFactor => new_size.scale_factor,
         } as f32;
-        inner.points_per_pixel = inner.pixels_per_point.recip();
 
         inner.physical_size = new_size.physical;
 
-        let screen_rect = calculate_screen_rect(inner.physical_size, inner.points_per_pixel);
+        let screen_rect =
+            calculate_screen_rect(inner.physical_size, inner.effective_points_per_pixel());
 
         inner.egui_input.screen_rect = Some(screen_rect);
 
@@ -493,9 +507,10 @@ where
 
                     // `baseview` reports mouse positions in physical pixels; egui expects
                     // logical points.
+                    let points_per_pixel = inner.effective_points_per_pixel();
                     let pos = pos2(
-                        position.x as f32 * inner.points_per_pixel,
-                        position.y as f32 * inner.points_per_pixel,
+                        position.x as f32 * points_per_pixel,
+                        position.y as f32 * points_per_pixel,
                     );
                     inner.pointer_pos_in_points = Some(pos);
                     inner.egui_input.events.push(egui::Event::PointerMoved(pos));
@@ -544,7 +559,7 @@ where
 
                         baseview::ScrollDelta::Pixels { x, y } => (
                             egui::MouseWheelUnit::Point,
-                            egui::vec2(*x, *y) * inner.points_per_pixel,
+                            egui::vec2(*x, *y) * inner.effective_points_per_pixel(),
                         ),
                     };
 
