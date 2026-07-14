@@ -4,6 +4,7 @@ pub mod node_view;
 pub mod theme;
 
 use crate::compiler::compile_preview;
+use crate::compiler::descriptor::PreviewCurve;
 use crate::gui::graph::GraphAction;
 use crate::model::{
     NodeModel, NodeRuntimeParams, NodeType, PresetState, RootNote, RuntimeSnapshot, ScaleMode,
@@ -15,12 +16,64 @@ use nih_plug_egui::{egui, widgets};
 
 const UI_VERSION_TEXT: &str = env!("CARGO_PKG_VERSION");
 
+/// Cached result of the (expensive) greedy preview fit.
+///
+/// `compile_preview` runs a full greedy all-pass fit — up to `max_sections` (1024 by
+/// default) iterations, each scanning every frequency/Q candidate over a 128-point grid.
+/// That is far too heavy to run on every GUI frame, and the egui-baseview editor requests
+/// a repaint on every frame regardless of whether anything changed. Recomputing it
+/// unconditionally pins the GUI thread at 100% CPU, which makes the window appear frozen —
+/// observed on Windows/Bitwig but a platform-independent hazard. We therefore recompute
+/// only when an input that actually affects the curve changes.
+#[derive(Clone)]
+struct PreviewCache {
+    snapshot: RuntimeSnapshot,
+    graph_max_ms: f32,
+    sample_rate: f32,
+    preview: PreviewCurve,
+}
+
+/// Return the preview curve for `snapshot`, reusing the cached result stored in the egui
+/// context whenever the inputs are unchanged. The cache lives in the egui context's temp
+/// data, so it is only ever touched from the GUI thread and needs no locking.
+fn memoized_preview(
+    ctx: &egui::Context,
+    snapshot: &RuntimeSnapshot,
+    sample_rate: f32,
+    graph_max_ms: f32,
+) -> PreviewCurve {
+    let cache_id = egui::Id::new("dispersion_preview_cache");
+
+    if let Some(cache) = ctx.data(|data| data.get_temp::<PreviewCache>(cache_id)) {
+        if cache.snapshot == *snapshot
+            && cache.graph_max_ms.to_bits() == graph_max_ms.to_bits()
+            && cache.sample_rate.to_bits() == sample_rate.to_bits()
+        {
+            return cache.preview;
+        }
+    }
+
+    let preview = compile_preview(snapshot, sample_rate, graph_max_ms);
+    ctx.data_mut(|data| {
+        data.insert_temp(
+            cache_id,
+            PreviewCache {
+                snapshot: *snapshot,
+                graph_max_ms,
+                sample_rate,
+                preview: preview.clone(),
+            },
+        );
+    });
+    preview
+}
+
 pub fn draw_editor(ctx: &egui::Context, setter: &ParamSetter, params: &PluginParams) {
     let sample_rate = 48_000.0;
     let host_sync_repaint_key = egui::Id::new("host_sync_repaint_frames");
     let mut graph_max_ms = preset_state(params).graph_max_ms;
     let mut snapshot = ui_snapshot(params);
-    let mut preview = compile_preview(&snapshot, sample_rate, graph_max_ms);
+    let mut preview = memoized_preview(ctx, &snapshot, sample_rate, graph_max_ms);
 
     // Helper: refresh snapshot/preview after any state mutation so downstream
     // panels see the updated state in the same frame.
@@ -28,7 +81,7 @@ pub fn draw_editor(ctx: &egui::Context, setter: &ParamSetter, params: &PluginPar
         () => {{
             graph_max_ms = preset_state(params).graph_max_ms;
             snapshot = ui_snapshot(params);
-            preview = compile_preview(&snapshot, sample_rate, graph_max_ms);
+            preview = memoized_preview(ctx, &snapshot, sample_rate, graph_max_ms);
             ctx.request_repaint();
         }};
     }
