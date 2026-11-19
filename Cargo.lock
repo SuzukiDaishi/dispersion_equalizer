@@ -830,7 +830,7 @@ dependencies = [
 
 [[package]]
 name = "dispersion_equalizer"
-version = "0.1.15"
+version = "0.1.16"
 dependencies = [
  "arc-swap",
  "arrayvec",
